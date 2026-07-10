@@ -1,0 +1,98 @@
+Documentation Logging Dashboard Release Instructions
+====================================================
+
+This release workflow creates a local Windows executable that can be launched by
+double-clicking the .exe. It does not add an installer, database, login system,
+or cloud sync.
+
+How to publish
+--------------
+
+From the repository root, run:
+
+powershell -ExecutionPolicy Bypass -File .\publish-windows.ps1
+
+The script publishes the app for Windows x64 using Release configuration,
+self-contained output, and single-file publishing.
+
+Published app location
+----------------------
+
+The published app folder is:
+
+PublishedApp\win-x64
+
+The expected executable is:
+
+PublishedApp\win-x64\DocumentationLoggingDashboard.exe
+
+Launch the dashboard
+--------------------
+
+Open PublishedApp\win-x64, then double-click:
+
+DocumentationLoggingDashboard.exe
+
+You do not need to open VS Code or Visual Studio to run the published app.
+
+Create a desktop shortcut
+-------------------------
+
+1. Open PublishedApp\win-x64.
+2. Right-click DocumentationLoggingDashboard.exe.
+3. Choose Show more options if needed.
+4. Choose Send to > Desktop (create shortcut).
+
+Default logs location
+---------------------
+
+By default, logs are saved in a DocumentationLogs folder beside the published
+app:
+
+PublishedApp\win-x64\DocumentationLogs
+
+The app creates these folders automatically when needed:
+
+DocumentationLogs\DebuggingLogs
+DocumentationLogs\ScriptEditingLogs
+DocumentationLogs\ScriptCreationLogs
+DocumentationLogs\Index
+
+LogIndex.txt is saved in:
+
+DocumentationLogs\Index\LogIndex.txt
+
+Changing the logs folder
+------------------------
+
+Inside the dashboard, use Change Logs Folder to select a different writable
+folder for future logs. The dashboard creates the expected folder structure in
+the selected location. Existing logs are not moved automatically.
+
+Use Reset to Default Folder to return to the DocumentationLogs folder beside the
+published app.
+
+Settings files
+--------------
+
+appsettings.json is included in the publish output and provides the default
+DocumentationLogs setting.
+
+user-settings.json is not included by default. The app creates it at runtime
+beside the executable when the logs folder is changed or reset from inside the
+dashboard.
+
+Writable folder warning
+-----------------------
+
+Do not place the published app in protected folders such as C:\Program Files\
+unless settings and logs are configured to a writable location. If the app is in
+a protected folder, Windows may block writing user-settings.json or local logs
+beside the executable.
+
+Privacy reminder
+----------------
+
+Avoid entering guest names, emails, payment data, credentials, or full hotel
+files into logs. Use ticket IDs, hotel IDs, script names, and summarized issues
+instead.

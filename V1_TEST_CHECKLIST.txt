@@ -1,0 +1,142 @@
+Documentation Logging Dashboard V1 Test Checklist
+=================================================
+
+Use this checklist for manual UI testing after the build passes.
+
+Startup
+-------
+
+[ ] Start the app.
+[ ] Confirm the dashboard opens without errors.
+[ ] Confirm the current documentation root folder path is visible.
+[ ] Confirm the privacy reminder is visible:
+    Reminder: Do not enter guest names, emails, payment data, credentials, or full hotel files into logs. Use ticket IDs, hotel IDs, script names, and summarized issues instead.
+
+Preview each log type
+---------------------
+
+[ ] Select Debugging Log.
+[ ] Fill all required Debugging Log fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Preview Entry.
+[ ] Confirm the preview includes a DEBUG-yyyyMMdd-### Log ID.
+[ ] Confirm blank optional fields show N/A.
+
+[ ] Select Script Editing Log.
+[ ] Fill all required Script Editing Log fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Preview Entry.
+[ ] Confirm the preview includes an EDIT-yyyyMMdd-### Log ID.
+[ ] Confirm blank optional fields show N/A.
+
+[ ] Select Script Creation Log.
+[ ] Fill all required Script Creation Log fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Preview Entry.
+[ ] Confirm the preview includes a CREATE-yyyyMMdd-### Log ID.
+[ ] Confirm blank optional fields show N/A.
+
+Required-field validation
+-------------------------
+
+[ ] Select Debugging Log.
+[ ] Clear at least one required Debugging Log field.
+[ ] Click Preview Entry and confirm the missing field is reported.
+[ ] Click Submit Entry and confirm the missing field is reported.
+
+[ ] Select Script Editing Log.
+[ ] Clear at least one required Script Editing Log field.
+[ ] Click Preview Entry and confirm the missing field is reported.
+[ ] Click Submit Entry and confirm the missing field is reported.
+
+[ ] Select Script Creation Log.
+[ ] Clear at least one required Script Creation Log field.
+[ ] Click Preview Entry and confirm the missing field is reported.
+[ ] Click Submit Entry and confirm the missing field is reported.
+
+Submit entries
+--------------
+
+[ ] Select Debugging Log.
+[ ] Fill all required fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Submit Entry.
+[ ] Confirm the success message appears.
+[ ] Confirm the form clears.
+
+[ ] Select Script Editing Log.
+[ ] Fill all required fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Submit Entry.
+[ ] Confirm the success message appears.
+[ ] Confirm the form clears.
+
+[ ] Select Script Creation Log.
+[ ] Fill all required fields.
+[ ] Leave Created By blank.
+[ ] Leave Notes / Follow-up blank.
+[ ] Click Submit Entry.
+[ ] Confirm the success message appears.
+[ ] Confirm the form clears.
+
+Files and folders
+-----------------
+
+[ ] Confirm the selected documentation root folder contains DebuggingLogs.
+[ ] Confirm the selected documentation root folder contains ScriptEditingLogs.
+[ ] Confirm the selected documentation root folder contains ScriptCreationLogs.
+[ ] Confirm the selected documentation root folder contains Index.
+[ ] Confirm today's Debugging Log file exists as yyyy-MM-dd_DebuggingLog.txt.
+[ ] Confirm today's Script Editing Log file exists as yyyy-MM-dd_ScriptEditingLog.txt.
+[ ] Confirm today's Script Creation Log file exists as yyyy-MM-dd_ScriptCreationLog.txt.
+[ ] Open each daily .txt file and confirm the saved entry format is readable.
+[ ] Confirm blank Created By values saved as N/A.
+[ ] Confirm blank Notes / Follow-up values saved as N/A.
+
+LogIndex.txt
+------------
+
+[ ] Confirm Index/LogIndex.txt exists.
+[ ] Confirm each submitted entry added one pipe-separated index line.
+[ ] Confirm the Debugging Log line uses Hotel: {Hotel Name} / {Hotel ID}.
+[ ] Confirm the Debugging Log line uses PMS: {PMS}.
+[ ] Confirm the Script Editing Log line uses Script: {Script Name}.
+[ ] Confirm the Script Editing Log line uses Hotel Applied To: {Hotel Applied To}.
+[ ] Confirm the Script Creation Log line uses Script: {Script Name}.
+[ ] Confirm the Script Creation Log line uses Hotels That Use This Script: {Hotels that use this script}.
+[ ] Confirm each index line includes the saved daily log file path.
+
+Open buttons
+------------
+
+[ ] Select a log type with a saved entry for today.
+[ ] Click Open Today's Log File and confirm today's selected log file opens.
+[ ] Select a log type with no saved entry for today, if available.
+[ ] Click Open Today's Log File and confirm a friendly not-found message appears.
+[ ] Click Open Logs Folder and confirm the current documentation root folder opens.
+[ ] Click Open Log Index and confirm LogIndex.txt opens.
+
+Folder settings
+---------------
+
+[ ] Click Change Logs Folder.
+[ ] Select a new test folder.
+[ ] Confirm the displayed documentation root folder changes.
+[ ] Submit a new entry.
+[ ] Confirm the new entry is saved under the newly selected folder.
+[ ] Confirm changing the logs folder does not move old logs.
+[ ] Click Reset to Default Folder.
+[ ] Confirm the displayed documentation root folder returns to the default DocumentationLogs location.
+[ ] Submit a new entry.
+[ ] Confirm the new entry is saved under the default folder.
+
+Privacy
+-------
+
+[ ] Confirm testers know not to enter guest names, emails, payment data, credentials, or full hotel files.
+[ ] Use only ticket IDs, hotel IDs, script names, and summarized issues in test entries.

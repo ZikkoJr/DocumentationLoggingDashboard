@@ -1,0 +1,44 @@
+# Build output
+bin/
+obj/
+[Bb]uild/
+[Rr]elease/
+[Dd]ebug/
+
+# Visual Studio user state
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Published/runtime output
+PublishedApp/
+DocumentationLogs/
+user-settings.json
+
+# Logs and diagnostics
+*.log
+*.tlog
+*.binlog
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# NuGet/package output
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# OS/editor noise
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*.swo
