@@ -20,9 +20,18 @@ public partial class QaChecklistItemControl : UserControl
             ApplyUserStatus(QaCheckStatus.Pass, passRadioButton.Checked);
         failRadioButton.CheckedChanged += (_, _) =>
             ApplyUserStatus(QaCheckStatus.Fail, failRadioButton.Checked);
+        warningFoundCheckBox.CheckedChanged += (_, _) =>
+            ApplyWarningSelection();
+        notesTextBox.TextChanged += (_, _) => ApplyNotes();
     }
 
     public string CheckId { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets whether the user selected a separate warning for this passed check.
+    /// The report's deterministic warning finding remains the authoritative state.
+    /// </summary>
+    public bool WarningFound => warningFoundCheckBox.Checked;
 
     public event EventHandler? ResultChanged;
 
@@ -59,10 +68,28 @@ public partial class QaChecklistItemControl : UserControl
         AccessibleDescription = definition.Description;
         passRadioButton.AccessibleName = $"Pass: {definition.DisplayName}";
         failRadioButton.AccessibleName = $"Fail: {definition.DisplayName}";
+        warningFoundCheckBox.AccessibleName =
+            $"Warning found for passed check: {definition.DisplayName}";
+        notesTextBox.AccessibleName =
+            $"Check notes or warning explanation: {definition.DisplayName}";
         descriptionToolTip.SetToolTip(displayNameLabel, definition.Description);
         descriptionToolTip.SetToolTip(descriptionLabel, definition.Description);
 
+        SetWarningFoundCore(warningFound: false);
         SynchronizeFromResult();
+    }
+
+    /// <summary>
+    /// Synchronizes the warning checkbox from the corresponding deterministic finding.
+    /// Programmatic synchronization does not raise <see cref="ResultChanged"/>.
+    /// </summary>
+    public void SetWarningFound(bool warningFound)
+    {
+        QaCheckResult result = GetBoundResult();
+        bool canSelectWarning =
+            isApplicable && result.Status == QaCheckStatus.Pass;
+
+        SetWarningFoundCore(warningFound && canSelectWarning);
     }
 
     /// <summary>
@@ -72,6 +99,8 @@ public partial class QaChecklistItemControl : UserControl
     {
         QaCheckResult result = GetBoundResult();
         QaCheckStatus previousStatus = result.Status;
+        string? previousNotes = result.Notes;
+        bool previouslyWarningFound = WarningFound;
 
         result.ResultSource = QaResultSource.Manual;
 
@@ -91,7 +120,9 @@ public partial class QaChecklistItemControl : UserControl
         isApplicable = applicable;
         SynchronizeFromResult();
 
-        if (previousStatus != result.Status)
+        if (previousStatus != result.Status
+            || !string.Equals(previousNotes, result.Notes, StringComparison.Ordinal)
+            || previouslyWarningFound != WarningFound)
         {
             OnResultChanged();
         }
@@ -112,12 +143,51 @@ public partial class QaChecklistItemControl : UserControl
 
         boundResult.Status = status;
         boundResult.ResultSource = QaResultSource.Manual;
+        SynchronizeFromResult();
+        OnResultChanged();
+    }
+
+    private void ApplyWarningSelection()
+    {
+        if (isSynchronizing || boundResult is null)
+        {
+            return;
+        }
+
+        if (!isApplicable || boundResult.Status != QaCheckStatus.Pass)
+        {
+            SetWarningFoundCore(warningFound: false);
+            return;
+        }
+
+        UpdateWarningExplanationState();
+        OnResultChanged();
+    }
+
+    private void ApplyNotes()
+    {
+        if (isSynchronizing || !isApplicable || boundResult is null)
+        {
+            return;
+        }
+
+        string? notes = TrimToNull(notesTextBox.Text);
+        UpdateWarningExplanationState();
+
+        if (string.Equals(boundResult.Notes, notes, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        boundResult.Notes = notes;
+        boundResult.ResultSource = QaResultSource.Manual;
         OnResultChanged();
     }
 
     private void SynchronizeFromResult()
     {
         QaCheckResult result = GetBoundResult();
+        bool wasSynchronizing = isSynchronizing;
 
         isSynchronizing = true;
 
@@ -127,14 +197,76 @@ public partial class QaChecklistItemControl : UserControl
                 isApplicable && result.Status == QaCheckStatus.Pass;
             failRadioButton.Checked =
                 isApplicable && result.Status == QaCheckStatus.Fail;
+
+            if (!isApplicable)
+            {
+                if (notesTextBox.Text.Length != 0)
+                {
+                    notesTextBox.Clear();
+                }
+            }
+            else if (!OptionalTextMatches(notesTextBox.Text, result.Notes))
+            {
+                notesTextBox.Text = result.Notes ?? string.Empty;
+            }
+
+            bool canSelectWarning =
+                isApplicable && result.Status == QaCheckStatus.Pass;
+
+            if (!canSelectWarning)
+            {
+                warningFoundCheckBox.Checked = false;
+            }
+
+            warningFoundCheckBox.Enabled = canSelectWarning;
+            notesTextBox.Enabled = isApplicable;
             resultFlowLayoutPanel.Enabled = isApplicable;
             Enabled = isApplicable;
             Visible = isApplicable;
+            UpdateWarningExplanationState();
         }
         finally
         {
-            isSynchronizing = false;
+            isSynchronizing = wasSynchronizing;
         }
+    }
+
+    private void SetWarningFoundCore(bool warningFound)
+    {
+        bool wasSynchronizing = isSynchronizing;
+        isSynchronizing = true;
+
+        try
+        {
+            warningFoundCheckBox.Checked = warningFound;
+            UpdateWarningExplanationState();
+        }
+        finally
+        {
+            isSynchronizing = wasSynchronizing;
+        }
+    }
+
+    private void UpdateWarningExplanationState()
+    {
+        warningExplanationNeededLabel.Visible =
+            warningFoundCheckBox.Checked
+            && string.IsNullOrWhiteSpace(notesTextBox.Text);
+    }
+
+    private static bool OptionalTextMatches(string controlText, string? modelValue)
+    {
+        return string.Equals(
+            TrimToNull(controlText),
+            TrimToNull(modelValue),
+            StringComparison.Ordinal);
+    }
+
+    private static string? TrimToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
     }
 
     private QaCheckResult GetBoundResult()

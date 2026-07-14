@@ -12,6 +12,7 @@ partial class QaReportForm
     private TabPage reportDetailsTabPage;
     private TabPage rawFileTabPage;
     private TabPage databaseTabPage;
+    private TabPage findingsTabPage;
     private Panel reportDetailsScrollPanel;
     private TableLayoutPanel reportDetailsLayoutPanel;
     private GroupBox hotelGroupBox;
@@ -65,6 +66,13 @@ partial class QaReportForm
     private RadioButton noRejectedRecordsRadioButton;
     private FlowLayoutPanel rawChecklistFlowLayoutPanel;
     private FlowLayoutPanel databaseChecklistFlowLayoutPanel;
+    private TableLayoutPanel findingsLayoutPanel;
+    private GroupBox warningsGroupBox;
+    private FlowLayoutPanel warningsFlowLayoutPanel;
+    private Label noWarningsLabel;
+    private GroupBox failedChecksGroupBox;
+    private FlowLayoutPanel failedChecksFlowLayoutPanel;
+    private Label noFailedChecksLabel;
     private FlowLayoutPanel actionFlowLayoutPanel;
     private Button closeButton;
 
@@ -141,6 +149,14 @@ partial class QaReportForm
         rawChecklistFlowLayoutPanel = new FlowLayoutPanel();
         databaseTabPage = new TabPage();
         databaseChecklistFlowLayoutPanel = new FlowLayoutPanel();
+        findingsTabPage = new TabPage();
+        findingsLayoutPanel = new TableLayoutPanel();
+        warningsGroupBox = new GroupBox();
+        warningsFlowLayoutPanel = new FlowLayoutPanel();
+        noWarningsLabel = new Label();
+        failedChecksGroupBox = new GroupBox();
+        failedChecksFlowLayoutPanel = new FlowLayoutPanel();
+        noFailedChecksLabel = new Label();
         actionFlowLayoutPanel = new FlowLayoutPanel();
         closeButton = new Button();
         mainLayoutPanel.SuspendLayout();
@@ -169,6 +185,12 @@ partial class QaReportForm
         rejectedRecordsFlowLayoutPanel.SuspendLayout();
         rawFileTabPage.SuspendLayout();
         databaseTabPage.SuspendLayout();
+        findingsTabPage.SuspendLayout();
+        findingsLayoutPanel.SuspendLayout();
+        warningsGroupBox.SuspendLayout();
+        warningsFlowLayoutPanel.SuspendLayout();
+        failedChecksGroupBox.SuspendLayout();
+        failedChecksFlowLayoutPanel.SuspendLayout();
         actionFlowLayoutPanel.SuspendLayout();
         SuspendLayout();
         //
@@ -199,7 +221,7 @@ partial class QaReportForm
         privacyReminderLabel.Padding = new Padding(6);
         privacyReminderLabel.Size = new Size(1030, 72);
         privacyReminderLabel.TabIndex = 0;
-        privacyReminderLabel.Text = "Do not enter guest names, guest emails, payment information, credentials, or full hotel-file contents. Use Hotel IDs, File Month, summarized QA results, and non-sensitive observations.";
+        privacyReminderLabel.Text = "Do not enter guest names, guest email addresses, reservation-level personal information, payment information, credentials, or full hotel-file contents. Use field names, counts, percentages, script names, and summarized conditions.";
         privacyReminderLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
         // reportTabControl
@@ -207,6 +229,7 @@ partial class QaReportForm
         reportTabControl.Controls.Add(reportDetailsTabPage);
         reportTabControl.Controls.Add(rawFileTabPage);
         reportTabControl.Controls.Add(databaseTabPage);
+        reportTabControl.Controls.Add(findingsTabPage);
         reportTabControl.Dock = DockStyle.Fill;
         reportTabControl.Location = new Point(15, 87);
         reportTabControl.Name = "reportTabControl";
@@ -717,7 +740,7 @@ partial class QaReportForm
         moreThanTwoMonetaryColumnsNoteLabel.Name = "moreThanTwoMonetaryColumnsNoteLabel";
         moreThanTwoMonetaryColumnsNoteLabel.Size = new Size(321, 45);
         moreThanTwoMonetaryColumnsNoteLabel.TabIndex = 3;
-        moreThanTwoMonetaryColumnsNoteLabel.Text = "A later phase will record a warning for files with more than two monetary-value columns.";
+        moreThanTwoMonetaryColumnsNoteLabel.Text = "A warning for this condition is recorded in Findings.";
         moreThanTwoMonetaryColumnsNoteLabel.Visible = false;
         //
         // confirmationCandidatesGroupBox
@@ -913,6 +936,104 @@ partial class QaReportForm
         databaseChecklistFlowLayoutPanel.TabIndex = 0;
         databaseChecklistFlowLayoutPanel.WrapContents = false;
         //
+        // findingsTabPage
+        //
+        findingsTabPage.Controls.Add(findingsLayoutPanel);
+        findingsTabPage.Location = new Point(4, 24);
+        findingsTabPage.Name = "findingsTabPage";
+        findingsTabPage.Padding = new Padding(8);
+        findingsTabPage.Size = new Size(1022, 562);
+        findingsTabPage.TabIndex = 3;
+        findingsTabPage.Text = "Findings";
+        findingsTabPage.UseVisualStyleBackColor = true;
+        //
+        // findingsLayoutPanel
+        //
+        findingsLayoutPanel.ColumnCount = 1;
+        findingsLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        findingsLayoutPanel.Controls.Add(warningsGroupBox, 0, 0);
+        findingsLayoutPanel.Controls.Add(failedChecksGroupBox, 0, 1);
+        findingsLayoutPanel.Dock = DockStyle.Fill;
+        findingsLayoutPanel.Location = new Point(8, 8);
+        findingsLayoutPanel.Name = "findingsLayoutPanel";
+        findingsLayoutPanel.RowCount = 2;
+        findingsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        findingsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        findingsLayoutPanel.Size = new Size(1006, 546);
+        findingsLayoutPanel.TabIndex = 0;
+        //
+        // warningsGroupBox
+        //
+        warningsGroupBox.Controls.Add(warningsFlowLayoutPanel);
+        warningsGroupBox.Dock = DockStyle.Fill;
+        warningsGroupBox.Location = new Point(3, 3);
+        warningsGroupBox.Name = "warningsGroupBox";
+        warningsGroupBox.Padding = new Padding(8);
+        warningsGroupBox.Size = new Size(1000, 267);
+        warningsGroupBox.TabIndex = 0;
+        warningsGroupBox.TabStop = false;
+        warningsGroupBox.Text = "Warnings";
+        //
+        // warningsFlowLayoutPanel
+        //
+        warningsFlowLayoutPanel.AutoScroll = true;
+        warningsFlowLayoutPanel.Controls.Add(noWarningsLabel);
+        warningsFlowLayoutPanel.Dock = DockStyle.Fill;
+        warningsFlowLayoutPanel.FlowDirection = FlowDirection.TopDown;
+        warningsFlowLayoutPanel.Location = new Point(8, 24);
+        warningsFlowLayoutPanel.Name = "warningsFlowLayoutPanel";
+        warningsFlowLayoutPanel.Padding = new Padding(0, 0, 8, 0);
+        warningsFlowLayoutPanel.Size = new Size(984, 235);
+        warningsFlowLayoutPanel.TabIndex = 0;
+        warningsFlowLayoutPanel.WrapContents = false;
+        //
+        // noWarningsLabel
+        //
+        noWarningsLabel.AutoSize = true;
+        noWarningsLabel.ForeColor = SystemColors.GrayText;
+        noWarningsLabel.Location = new Point(3, 6);
+        noWarningsLabel.Margin = new Padding(3, 6, 3, 3);
+        noWarningsLabel.Name = "noWarningsLabel";
+        noWarningsLabel.Size = new Size(77, 15);
+        noWarningsLabel.TabIndex = 0;
+        noWarningsLabel.Text = "No warnings";
+        //
+        // failedChecksGroupBox
+        //
+        failedChecksGroupBox.Controls.Add(failedChecksFlowLayoutPanel);
+        failedChecksGroupBox.Dock = DockStyle.Fill;
+        failedChecksGroupBox.Location = new Point(3, 276);
+        failedChecksGroupBox.Name = "failedChecksGroupBox";
+        failedChecksGroupBox.Padding = new Padding(8);
+        failedChecksGroupBox.Size = new Size(1000, 267);
+        failedChecksGroupBox.TabIndex = 1;
+        failedChecksGroupBox.TabStop = false;
+        failedChecksGroupBox.Text = "Failed Checks";
+        //
+        // failedChecksFlowLayoutPanel
+        //
+        failedChecksFlowLayoutPanel.AutoScroll = true;
+        failedChecksFlowLayoutPanel.Controls.Add(noFailedChecksLabel);
+        failedChecksFlowLayoutPanel.Dock = DockStyle.Fill;
+        failedChecksFlowLayoutPanel.FlowDirection = FlowDirection.TopDown;
+        failedChecksFlowLayoutPanel.Location = new Point(8, 24);
+        failedChecksFlowLayoutPanel.Name = "failedChecksFlowLayoutPanel";
+        failedChecksFlowLayoutPanel.Padding = new Padding(0, 0, 8, 0);
+        failedChecksFlowLayoutPanel.Size = new Size(984, 235);
+        failedChecksFlowLayoutPanel.TabIndex = 0;
+        failedChecksFlowLayoutPanel.WrapContents = false;
+        //
+        // noFailedChecksLabel
+        //
+        noFailedChecksLabel.AutoSize = true;
+        noFailedChecksLabel.ForeColor = SystemColors.GrayText;
+        noFailedChecksLabel.Location = new Point(3, 6);
+        noFailedChecksLabel.Margin = new Padding(3, 6, 3, 3);
+        noFailedChecksLabel.Name = "noFailedChecksLabel";
+        noFailedChecksLabel.Size = new Size(96, 15);
+        noFailedChecksLabel.TabIndex = 0;
+        noFailedChecksLabel.Text = "No failed checks";
+        //
         // actionFlowLayoutPanel
         //
         actionFlowLayoutPanel.Controls.Add(closeButton);
@@ -990,6 +1111,14 @@ partial class QaReportForm
         rejectedRecordsFlowLayoutPanel.PerformLayout();
         rawFileTabPage.ResumeLayout(false);
         databaseTabPage.ResumeLayout(false);
+        findingsTabPage.ResumeLayout(false);
+        findingsLayoutPanel.ResumeLayout(false);
+        warningsGroupBox.ResumeLayout(false);
+        warningsFlowLayoutPanel.ResumeLayout(false);
+        warningsFlowLayoutPanel.PerformLayout();
+        failedChecksGroupBox.ResumeLayout(false);
+        failedChecksFlowLayoutPanel.ResumeLayout(false);
+        failedChecksFlowLayoutPanel.PerformLayout();
         actionFlowLayoutPanel.ResumeLayout(false);
         ResumeLayout(false);
     }

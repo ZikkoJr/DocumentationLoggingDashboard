@@ -7,7 +7,7 @@ using DocumentationLoggingDashboard.QAReports.Services;
 namespace DocumentationLoggingDashboard.QAReports.Forms;
 
 /// <summary>
-/// Owns and synchronizes one in-memory Phase 5 QA report draft.
+/// Owns and synchronizes one in-memory Phase 6 QA report draft.
 /// </summary>
 public partial class QaReportForm : Form
 {
@@ -15,12 +15,17 @@ public partial class QaReportForm : Form
 
     private readonly QaMetadataService metadataService;
     private readonly IReadOnlyList<QaCheckDefinition> checklistDefinitions;
+    private readonly IReadOnlyDictionary<string, QaCheckDefinition> checklistDefinitionsById;
     private readonly Dictionary<string, QaCheckResult> checklistResultsById;
     private readonly Dictionary<string, QaChecklistItemControl> checklistControlsById =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, QaFindingItemControl> findingControlsById =
+        new(StringComparer.Ordinal);
+    private readonly QaFindingSynchronizationService findingSynchronizationService;
 
     private IReadOnlyList<QaPmsMetadata> pmsSystems;
     private IReadOnlyList<QaHotelMetadata> hotels;
+    private bool isSynchronizingFindings;
 
     public QaReportForm(
         QaMetadataService metadataService,
@@ -35,6 +40,11 @@ public partial class QaReportForm : Form
         CurrentReport = CreateCurrentReport(
             checklistDefinitions,
             out checklistResultsById);
+        checklistDefinitionsById = checklistDefinitions.ToDictionary(
+            definition => definition.Id,
+            StringComparer.Ordinal);
+        findingSynchronizationService = new QaFindingSynchronizationService(
+            checklistDefinitions);
 
         InitializeComponent();
         InitializeReportInputs();
@@ -96,7 +106,7 @@ public partial class QaReportForm : Form
         if (definitions.Count != ExpectedChecklistDefinitionCount)
         {
             throw new InvalidOperationException(
-                $"The QA checklist catalog must contain exactly {ExpectedChecklistDefinitionCount} definitions for Phase 5.");
+                $"The QA checklist catalog must contain exactly {ExpectedChecklistDefinitionCount} definitions for the QA report form.");
         }
 
         HashSet<string> definitionIds = new(StringComparer.Ordinal);
@@ -219,6 +229,10 @@ public partial class QaReportForm : Form
             ResizeChecklistControls(rawChecklistFlowLayoutPanel);
         databaseChecklistFlowLayoutPanel.SizeChanged += (_, _) =>
             ResizeChecklistControls(databaseChecklistFlowLayoutPanel);
+        warningsFlowLayoutPanel.SizeChanged += (_, _) =>
+            ResizeFindingControls(warningsFlowLayoutPanel);
+        failedChecksFlowLayoutPanel.SizeChanged += (_, _) =>
+            ResizeFindingControls(failedChecksFlowLayoutPanel);
     }
 
     private void SynchronizeReportInputs()
@@ -356,6 +370,7 @@ public partial class QaReportForm : Form
             };
 
             itemControl.Bind(definition, result);
+            itemControl.ResultChanged += ChecklistItemControl_ResultChanged;
             targetPanel.Controls.Add(itemControl);
 
             if (!checklistControlsById.TryAdd(definition.Id, itemControl))
@@ -394,6 +409,41 @@ public partial class QaReportForm : Form
         }
     }
 
+    private void ChecklistItemControl_ResultChanged(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        if (isSynchronizingFindings)
+        {
+            return;
+        }
+
+        if (sender is not QaChecklistItemControl itemControl
+            || !checklistControlsById.TryGetValue(
+                itemControl.CheckId,
+                out QaChecklistItemControl? registeredControl)
+            || !ReferenceEquals(itemControl, registeredControl))
+        {
+            throw new InvalidOperationException(
+                "A checklist result-change event came from an unregistered control.");
+        }
+
+        isSynchronizingFindings = true;
+
+        try
+        {
+            findingSynchronizationService.SetChecklistWarningSelected(
+                CurrentReport,
+                itemControl.CheckId,
+                itemControl.WarningFound);
+            SynchronizeFindingsAndRefreshUiCore();
+        }
+        finally
+        {
+            isSynchronizingFindings = false;
+        }
+    }
+
     private void SynchronizeCharacteristicsWhenChecked(RadioButton radioButton)
     {
         if (radioButton.Checked)
@@ -404,30 +454,45 @@ public partial class QaReportForm : Form
 
     private void SynchronizeFileCharacteristics()
     {
-        QaFileCharacteristics characteristics = CurrentReport.FileCharacteristics;
+        if (isSynchronizingFindings)
+        {
+            return;
+        }
 
-        characteristics.NameColumnMode = fullNameColumnRadioButton.Checked
-            ? QaNameColumnMode.FullName
-            : QaNameColumnMode.SeparateFirstAndLastName;
-        characteristics.HasCurrencyColumn = currencyColumnFoundRadioButton.Checked;
-        characteristics.MonetaryColumnScenario =
-            moreThanTwoMonetaryColumnsRadioButton.Checked
-                ? QaMonetaryColumnScenario.MoreThanTwoMonetaryColumns
-                : twoMonetaryColumnsRadioButton.Checked
-                    ? QaMonetaryColumnScenario.TwoMonetaryColumns
-                    : QaMonetaryColumnScenario.OneMonetaryColumn;
-        characteristics.HasMultipleConfirmationNumberCandidateColumns =
-            multipleConfirmationCandidatesRadioButton.Checked;
-        characteristics.IsCustomScriptSupportAvailable =
-            customScriptAvailableRadioButton.Checked;
-        characteristics.HasRejectedDatabaseRecords =
-            rejectedRecordsExistRadioButton.Checked;
+        isSynchronizingFindings = true;
 
-        moreThanTwoMonetaryColumnsNoteLabel.Visible =
-            characteristics.MonetaryColumnScenario ==
-                QaMonetaryColumnScenario.MoreThanTwoMonetaryColumns;
+        try
+        {
+            QaFileCharacteristics characteristics = CurrentReport.FileCharacteristics;
 
-        ApplyChecklistApplicability();
+            characteristics.NameColumnMode = fullNameColumnRadioButton.Checked
+                ? QaNameColumnMode.FullName
+                : QaNameColumnMode.SeparateFirstAndLastName;
+            characteristics.HasCurrencyColumn = currencyColumnFoundRadioButton.Checked;
+            characteristics.MonetaryColumnScenario =
+                moreThanTwoMonetaryColumnsRadioButton.Checked
+                    ? QaMonetaryColumnScenario.MoreThanTwoMonetaryColumns
+                    : twoMonetaryColumnsRadioButton.Checked
+                        ? QaMonetaryColumnScenario.TwoMonetaryColumns
+                        : QaMonetaryColumnScenario.OneMonetaryColumn;
+            characteristics.HasMultipleConfirmationNumberCandidateColumns =
+                multipleConfirmationCandidatesRadioButton.Checked;
+            characteristics.IsCustomScriptSupportAvailable =
+                customScriptAvailableRadioButton.Checked;
+            characteristics.HasRejectedDatabaseRecords =
+                rejectedRecordsExistRadioButton.Checked;
+
+            moreThanTwoMonetaryColumnsNoteLabel.Visible =
+                characteristics.MonetaryColumnScenario ==
+                    QaMonetaryColumnScenario.MoreThanTwoMonetaryColumns;
+
+            ApplyChecklistApplicability();
+            SynchronizeFindingsAndRefreshUiCore();
+        }
+        finally
+        {
+            isSynchronizingFindings = false;
+        }
     }
 
     private void ApplyChecklistApplicability()
@@ -446,6 +511,178 @@ public partial class QaReportForm : Form
                 definition,
                 CurrentReport.FileCharacteristics);
             itemControl.SetApplicable(isApplicable);
+        }
+    }
+
+    private void SynchronizeFindingsAndRefreshUi()
+    {
+        if (isSynchronizingFindings)
+        {
+            return;
+        }
+
+        isSynchronizingFindings = true;
+
+        try
+        {
+            SynchronizeFindingsAndRefreshUiCore();
+        }
+        finally
+        {
+            isSynchronizingFindings = false;
+        }
+    }
+
+    private void SynchronizeFindingsAndRefreshUiCore()
+    {
+        findingSynchronizationService.SynchronizeFindings(CurrentReport);
+        SynchronizeChecklistWarningControls();
+        RefreshFindingControls();
+    }
+
+    private void SynchronizeChecklistWarningControls()
+    {
+        HashSet<string> findingIds = CurrentReport.Findings
+            .Select(finding => finding.FindingId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach ((string checkId, QaChecklistItemControl itemControl)
+                 in checklistControlsById)
+        {
+            itemControl.SetWarningFound(
+                findingIds.Contains(QaFindingIds.WarningForCheck(checkId)));
+        }
+    }
+
+    private void RefreshFindingControls()
+    {
+        HashSet<string> currentIds = CurrentReport.Findings
+            .Select(finding => finding.FindingId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        warningsFlowLayoutPanel.SuspendLayout();
+        failedChecksFlowLayoutPanel.SuspendLayout();
+
+        try
+        {
+            foreach ((string findingId, QaFindingItemControl itemControl)
+                     in findingControlsById.ToArray())
+            {
+                if (currentIds.Contains(findingId))
+                {
+                    continue;
+                }
+
+                itemControl.FindingChanged -= FindingItemControl_FindingChanged;
+                itemControl.Parent?.Controls.Remove(itemControl);
+                itemControl.Dispose();
+                findingControlsById.Remove(findingId);
+            }
+
+            int warningIndex = 1;
+            int failureIndex = 1;
+
+            foreach (QaFinding finding in CurrentReport.Findings)
+            {
+                FlowLayoutPanel targetPanel = finding.Severity switch
+                {
+                    QaFindingSeverity.Warning => warningsFlowLayoutPanel,
+                    QaFindingSeverity.Failure => failedChecksFlowLayoutPanel,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(finding),
+                        finding.Severity,
+                        "Unknown QA finding severity.")
+                };
+
+                if (!findingControlsById.TryGetValue(
+                        finding.FindingId,
+                        out QaFindingItemControl? itemControl))
+                {
+                    itemControl = new QaFindingItemControl
+                    {
+                        Margin = new Padding(0, 0, 0, 8),
+                        Width = GetFindingControlWidth(targetPanel)
+                    };
+                    itemControl.FindingChanged += FindingItemControl_FindingChanged;
+                    findingControlsById.Add(finding.FindingId, itemControl);
+                }
+
+                if (!ReferenceEquals(itemControl.Parent, targetPanel))
+                {
+                    targetPanel.Controls.Add(itemControl);
+                }
+
+                string? relatedCheckDisplay = null;
+
+                if (!string.IsNullOrWhiteSpace(finding.RelatedCheckId))
+                {
+                    relatedCheckDisplay = checklistDefinitionsById.TryGetValue(
+                        finding.RelatedCheckId,
+                        out QaCheckDefinition? definition)
+                            ? definition.DisplayName
+                            : finding.RelatedCheckId;
+                }
+
+                itemControl.Bind(
+                    finding,
+                    relatedCheckDisplay,
+                    CurrentReport.FileCharacteristics
+                        .IsCustomScriptSupportAvailable);
+
+                int childIndex = finding.Severity == QaFindingSeverity.Warning
+                    ? warningIndex++
+                    : failureIndex++;
+                targetPanel.Controls.SetChildIndex(itemControl, childIndex);
+            }
+
+            noWarningsLabel.Visible = warningIndex == 1;
+            noFailedChecksLabel.Visible = failureIndex == 1;
+
+            ResizeFindingControls(warningsFlowLayoutPanel);
+            ResizeFindingControls(failedChecksFlowLayoutPanel);
+        }
+        finally
+        {
+            warningsFlowLayoutPanel.ResumeLayout(performLayout: true);
+            failedChecksFlowLayoutPanel.ResumeLayout(performLayout: true);
+        }
+    }
+
+    private void FindingItemControl_FindingChanged(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        if (sender is not QaFindingItemControl itemControl
+            || !findingControlsById.TryGetValue(
+                itemControl.FindingId,
+                out QaFindingItemControl? registeredControl)
+            || !ReferenceEquals(itemControl, registeredControl))
+        {
+            throw new InvalidOperationException(
+                "A finding-change event came from an unregistered control.");
+        }
+
+        SynchronizeFindingsAndRefreshUi();
+    }
+
+    private static int GetFindingControlWidth(FlowLayoutPanel panel)
+    {
+        int availableWidth = panel.ClientSize.Width
+            - panel.Padding.Horizontal
+            - SystemInformation.VerticalScrollBarWidth
+            - 4;
+
+        return Math.Max(520, availableWidth);
+    }
+
+    private static void ResizeFindingControls(FlowLayoutPanel panel)
+    {
+        int width = GetFindingControlWidth(panel);
+
+        foreach (QaFindingItemControl itemControl
+                 in panel.Controls.OfType<QaFindingItemControl>())
+        {
+            itemControl.Width = width;
         }
     }
 
