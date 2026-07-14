@@ -18,6 +18,7 @@ partial class MainForm
     private TableLayoutPanel logTypeLayoutPanel;
     private Label logTypeLabel;
     private ComboBox logTypeComboBox;
+    private Button manageQaHotelsPmsButton;
     private SplitContainer contentSplitContainer;
     private Panel fieldsScrollPanel;
     private TableLayoutPanel fieldsTableLayoutPanel;
@@ -63,6 +64,7 @@ partial class MainForm
         logTypeLayoutPanel = new TableLayoutPanel();
         logTypeLabel = new Label();
         logTypeComboBox = new ComboBox();
+        manageQaHotelsPmsButton = new Button();
         contentSplitContainer = new SplitContainer();
         fieldsScrollPanel = new Panel();
         fieldsTableLayoutPanel = new TableLayoutPanel();
@@ -198,11 +200,13 @@ partial class MainForm
         // 
         // logTypeLayoutPanel
         // 
-        logTypeLayoutPanel.ColumnCount = 2;
+        logTypeLayoutPanel.ColumnCount = 3;
         logTypeLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
         logTypeLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260F));
+        logTypeLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         logTypeLayoutPanel.Controls.Add(logTypeLabel, 0, 0);
         logTypeLayoutPanel.Controls.Add(logTypeComboBox, 1, 0);
+        logTypeLayoutPanel.Controls.Add(manageQaHotelsPmsButton, 2, 0);
         logTypeLayoutPanel.Dock = DockStyle.Fill;
         logTypeLayoutPanel.Location = new Point(19, 169);
         logTypeLayoutPanel.Name = "logTypeLayoutPanel";
@@ -231,6 +235,16 @@ partial class MainForm
         logTypeComboBox.Name = "logTypeComboBox";
         logTypeComboBox.Size = new Size(240, 23);
         logTypeComboBox.TabIndex = 1;
+        //
+        // manageQaHotelsPmsButton
+        //
+        manageQaHotelsPmsButton.Anchor = AnchorStyles.Right;
+        manageQaHotelsPmsButton.Location = new Point(879, 4);
+        manageQaHotelsPmsButton.Name = "manageQaHotelsPmsButton";
+        manageQaHotelsPmsButton.Size = new Size(180, 30);
+        manageQaHotelsPmsButton.TabIndex = 2;
+        manageQaHotelsPmsButton.Text = "Manage QA Hotels / PMS";
+        manageQaHotelsPmsButton.UseVisualStyleBackColor = true;
         // 
         // contentSplitContainer
         // 
