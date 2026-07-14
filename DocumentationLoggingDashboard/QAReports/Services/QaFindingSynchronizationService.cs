@@ -1,3 +1,4 @@
+using System.Globalization;
 using DocumentationLoggingDashboard.QAReports.Definitions;
 using DocumentationLoggingDashboard.QAReports.Forms;
 using DocumentationLoggingDashboard.QAReports.Models;
@@ -11,22 +12,41 @@ public sealed class QaFindingSynchronizationService
 {
     private readonly IReadOnlyList<QaCheckDefinition> checklistDefinitions;
     private readonly Dictionary<string, QaCheckDefinition> checklistDefinitionsById;
+    private readonly IReadOnlyList<QaStatisticFieldDefinition> statisticFieldDefinitions;
+    private readonly Dictionary<string, QaStatisticFieldDefinition>
+        statisticFieldDefinitionsById;
     private readonly HashSet<string> managedFindingIds;
 
     public QaFindingSynchronizationService()
-        : this(QaChecklistCatalog.Definitions)
+        : this(
+            QaChecklistCatalog.Definitions,
+            QaStatisticFieldCatalog.Definitions)
     {
     }
 
     public QaFindingSynchronizationService(
         IReadOnlyList<QaCheckDefinition> checklistDefinitions)
+        : this(checklistDefinitions, QaStatisticFieldCatalog.Definitions)
+    {
+    }
+
+    public QaFindingSynchronizationService(
+        IReadOnlyList<QaCheckDefinition> checklistDefinitions,
+        IReadOnlyList<QaStatisticFieldDefinition> statisticFieldDefinitions)
     {
         ArgumentNullException.ThrowIfNull(checklistDefinitions);
+        ArgumentNullException.ThrowIfNull(statisticFieldDefinitions);
 
         this.checklistDefinitions = checklistDefinitions.ToArray();
         checklistDefinitionsById = ValidateAndIndexDefinitions(
             this.checklistDefinitions);
-        managedFindingIds = CreateManagedFindingIds(this.checklistDefinitions);
+        this.statisticFieldDefinitions = statisticFieldDefinitions.ToArray();
+        statisticFieldDefinitionsById = ValidateAndIndexStatisticDefinitions(
+            this.statisticFieldDefinitions,
+            checklistDefinitionsById);
+        managedFindingIds = CreateManagedFindingIds(
+            this.checklistDefinitions,
+            this.statisticFieldDefinitions);
     }
 
     /// <summary>
@@ -95,6 +115,7 @@ public sealed class QaFindingSynchronizationService
 
         Dictionary<string, QaFinding> expectedGeneratedById =
             BuildExpectedGeneratedFindings(
+                report,
                 resultsById,
                 existingById,
                 characteristics);
@@ -146,12 +167,20 @@ public sealed class QaFindingSynchronizationService
     }
 
     private Dictionary<string, QaFinding> BuildExpectedGeneratedFindings(
+        QaReport report,
         IReadOnlyDictionary<string, QaCheckResult> resultsById,
         IReadOnlyDictionary<string, QaFinding> existingById,
         QaFileCharacteristics characteristics)
     {
         Dictionary<string, QaFinding> expectedById =
             new(StringComparer.Ordinal);
+        QaStatistics statistics = GetStatistics(report);
+        bool rejectedRecordsStatisticWarningExpected =
+            statistics.Database.RejectedRecordCount > 0
+            && resultsById.TryGetValue(
+                QaChecklistIds.Database.RejectedRecordsAccountedFor,
+                out QaCheckResult? rejectedRecordsResult)
+            && rejectedRecordsResult.Status == QaCheckStatus.Pass;
 
         foreach (QaCheckDefinition definition in checklistDefinitions)
         {
@@ -169,6 +198,10 @@ public sealed class QaFindingSynchronizationService
 
             if (result.Status == QaCheckStatus.Pass
                 && existingById.ContainsKey(warningId)
+                && (!definition.Id.Equals(
+                        QaChecklistIds.Database.RejectedRecordsAccountedFor,
+                        StringComparison.Ordinal)
+                    || !rejectedRecordsStatisticWarningExpected)
                 && QaChecklistApplicabilityEvaluator.IsApplicable(
                     definition,
                     characteristics))
@@ -198,6 +231,14 @@ public sealed class QaFindingSynchronizationService
                 expectedById,
                 CreateMultipleConfirmationCandidatesWarning());
         }
+
+        AddExpectedStatisticFindings(
+            expectedById,
+            statistics,
+            resultsById,
+            existingById,
+            characteristics,
+            rejectedRecordsStatisticWarningExpected);
 
         return expectedById;
     }
@@ -276,6 +317,361 @@ public sealed class QaFindingSynchronizationService
             Resolution = QaFindingResolution.Active,
             Source = QaFindingSource.Checklist
         };
+    }
+
+    private void AddExpectedStatisticFindings(
+        IDictionary<string, QaFinding> expectedById,
+        QaStatistics statistics,
+        IReadOnlyDictionary<string, QaCheckResult> resultsById,
+        IReadOnlyDictionary<string, QaFinding> existingById,
+        QaFileCharacteristics characteristics,
+        bool rejectedRecordsStatisticWarningExpected)
+    {
+        AddExpectedBlankStatisticWarnings(
+            expectedById,
+            statistics,
+            characteristics);
+        AddExpectedBrokenStatisticFailures(
+            expectedById,
+            statistics,
+            characteristics);
+
+        if (IsStatisticFieldApplicable(
+                QaStatisticFieldIds.AverageRate,
+                characteristics)
+            && statistics.UnusualAverageRateValues.HasUnusualValues
+            && statistics.UnusualAverageRateValues.UnusualValueCount > 0)
+        {
+            AddExpected(
+                expectedById,
+                CreateUnusualMonetaryWarning(
+                    QaFindingIds.UnusualAverageRateStatisticWarning,
+                    "Average Rate",
+                    QaStatisticFieldIds.AverageRate,
+                    statistics.UnusualAverageRateValues,
+                    statistics));
+        }
+
+        if (IsStatisticFieldApplicable(
+                QaStatisticFieldIds.StayValue,
+                characteristics))
+        {
+            if (statistics.UnusualStayValues.HasUnusualValues
+                && statistics.UnusualStayValues.UnusualValueCount > 0)
+            {
+                AddExpected(
+                    expectedById,
+                    CreateUnusualMonetaryWarning(
+                        QaFindingIds.UnusualStayValueStatisticWarning,
+                        "Stay Value",
+                        QaStatisticFieldIds.StayValue,
+                        statistics.UnusualStayValues,
+                        statistics));
+            }
+
+            if (statistics.HighStayValues.StayValuesAboveTenThousandCount > 0
+                && !statistics.HighStayValues.AreHighValuesExpected)
+            {
+                AddExpected(
+                    expectedById,
+                    CreateHighStayValueWarning(statistics));
+            }
+        }
+
+        AddExpectedDatabaseStatisticWarnings(
+            expectedById,
+            statistics,
+            resultsById,
+            existingById,
+            rejectedRecordsStatisticWarningExpected);
+    }
+
+    private void AddExpectedBlankStatisticWarnings(
+        IDictionary<string, QaFinding> expectedById,
+        QaStatistics statistics,
+        QaFileCharacteristics characteristics)
+    {
+        foreach (QaBlankValueStatistic? statistic in statistics.BlankValues)
+        {
+            if (statistic is null
+                || string.IsNullOrWhiteSpace(statistic.FieldId)
+                || !statisticFieldDefinitionsById.TryGetValue(
+                    statistic.FieldId,
+                    out QaStatisticFieldDefinition? definition)
+                || !definition.SupportsBlankStatistics
+                || !QaStatisticFieldCatalog.IsApplicable(
+                    definition,
+                    characteristics))
+            {
+                continue;
+            }
+
+            decimal percentage =
+                QaStatisticsCalculationService.CalculatePercentage(
+                    statistic.BlankCount,
+                    statistic.TotalApplicableRows);
+
+            if (percentage > 50m)
+            {
+                AddExpected(
+                    expectedById,
+                    CreateBlankStatisticWarning(
+                        definition,
+                        statistic,
+                        percentage));
+            }
+        }
+    }
+
+    private void AddExpectedBrokenStatisticFailures(
+        IDictionary<string, QaFinding> expectedById,
+        QaStatistics statistics,
+        QaFileCharacteristics characteristics)
+    {
+        foreach (QaBrokenDataStatistic? statistic in statistics.BrokenData)
+        {
+            if (statistic is null
+                || statistic.BrokenValueCount <= 0
+                || string.IsNullOrWhiteSpace(statistic.FieldId)
+                || !statisticFieldDefinitionsById.TryGetValue(
+                    statistic.FieldId,
+                    out QaStatisticFieldDefinition? definition)
+                || !definition.SupportsBrokenDataStatistics
+                || !QaStatisticFieldCatalog.IsApplicable(
+                    definition,
+                    characteristics)
+                || !string.IsNullOrWhiteSpace(definition.RelatedChecklistId))
+            {
+                continue;
+            }
+
+            decimal percentage =
+                QaStatisticsCalculationService.CalculatePercentage(
+                    statistic.BrokenValueCount,
+                    statistic.TotalApplicableNonblankValues);
+            AddExpected(
+                expectedById,
+                CreateBrokenStatisticFailure(
+                    definition,
+                    statistic,
+                    percentage));
+        }
+    }
+
+    private void AddExpectedDatabaseStatisticWarnings(
+        IDictionary<string, QaFinding> expectedById,
+        QaStatistics statistics,
+        IReadOnlyDictionary<string, QaCheckResult> resultsById,
+        IReadOnlyDictionary<string, QaFinding> existingById,
+        bool rejectedRecordsStatisticWarningExpected)
+    {
+        int signedDifference =
+            QaStatisticsCalculationService.CalculateRawMinusImportedDifference(
+                statistics.FileInformation.TotalDataRows,
+                statistics.Database.ImportedRecordCount);
+        long absoluteDifference =
+            QaStatisticsCalculationService.GetAbsoluteDifference(signedDifference);
+
+        if (absoluteDifference >= 10L)
+        {
+            string? explanation = existingById.TryGetValue(
+                    QaFindingIds.RowDifferenceStatisticWarning,
+                    out QaFinding? existing)
+                ? TrimToNull(existing.ResolutionNotes)
+                : null;
+            AddExpected(
+                expectedById,
+                CreateRowDifferenceWarning(
+                    statistics.FileInformation.TotalDataRows,
+                    statistics.Database.ImportedRecordCount,
+                    signedDifference,
+                    absoluteDifference,
+                    explanation));
+        }
+
+        if (rejectedRecordsStatisticWarningExpected
+            && resultsById.TryGetValue(
+                QaChecklistIds.Database.RejectedRecordsAccountedFor,
+                out QaCheckResult? result))
+        {
+            AddExpected(
+                expectedById,
+                CreateRejectedRecordsWarning(
+                    statistics.Database.RejectedRecordCount,
+                    result));
+        }
+    }
+
+    private static QaFinding CreateBlankStatisticWarning(
+        QaStatisticFieldDefinition definition,
+        QaBlankValueStatistic statistic,
+        decimal calculatedPercentage)
+    {
+        return new QaFinding
+        {
+            FindingId = QaFindingIds.WarningForBlankStatistic(definition.Id),
+            Severity = QaFindingSeverity.Warning,
+            Title = $"High blank-value percentage: {definition.DisplayName}",
+            Description =
+                $"{definition.DisplayName} has {statistic.BlankCount} blank values out of {statistic.TotalApplicableRows} applicable rows ({FormatPercentage(calculatedPercentage)}%).",
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.Statistic
+        };
+    }
+
+    private static QaFinding CreateBrokenStatisticFailure(
+        QaStatisticFieldDefinition definition,
+        QaBrokenDataStatistic statistic,
+        decimal calculatedPercentage)
+    {
+        string description =
+            $"{definition.DisplayName} has {statistic.BrokenValueCount} broken populated values out of {statistic.TotalApplicableNonblankValues} applicable nonblank values ({FormatPercentage(calculatedPercentage)}%).";
+
+        return new QaFinding
+        {
+            FindingId = QaFindingIds.FailureForBrokenStatistic(definition.Id),
+            Severity = QaFindingSeverity.Failure,
+            Title = $"Broken data found: {definition.DisplayName}",
+            Description = AppendExplanation(description, statistic.Explanation),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.Statistic
+        };
+    }
+
+    private static QaFinding CreateUnusualMonetaryWarning(
+        string findingId,
+        string displayName,
+        string fieldId,
+        QaUnusualMonetaryValueStatistics statistic,
+        QaStatistics statistics)
+    {
+        int denominator = GetDerivedNonblankCount(statistics, fieldId);
+        decimal percentage =
+            QaStatisticsCalculationService.CalculatePercentage(
+                statistic.UnusualValueCount,
+                denominator);
+        string description =
+            $"{displayName} has {statistic.UnusualValueCount} manually identified unusual values out of {denominator} applicable nonblank values ({FormatPercentage(percentage)}%).";
+
+        return new QaFinding
+        {
+            FindingId = findingId,
+            Severity = QaFindingSeverity.Warning,
+            Title = $"Unusual {displayName} values were found",
+            Description = AppendExplanation(description, statistic.Explanation),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.Statistic
+        };
+    }
+
+    private static QaFinding CreateHighStayValueWarning(QaStatistics statistics)
+    {
+        QaHighStayValueStatistics statistic = statistics.HighStayValues;
+        int denominator = GetDerivedNonblankCount(
+            statistics,
+            QaStatisticFieldIds.StayValue);
+        decimal percentage =
+            QaStatisticsCalculationService.CalculatePercentage(
+                statistic.StayValuesAboveTenThousandCount,
+                denominator);
+        string description =
+            $"Stay Value has {statistic.StayValuesAboveTenThousandCount} values strictly above 10,000 out of {denominator} applicable nonblank values ({FormatPercentage(percentage)}%), and those high values were not expected.";
+
+        return new QaFinding
+        {
+            FindingId = QaFindingIds.HighStayValueStatisticWarning,
+            Severity = QaFindingSeverity.Warning,
+            Title = "Unexpected Stay Values strictly above 10,000",
+            Description = AppendExplanation(description, statistic.Explanation),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.Statistic
+        };
+    }
+
+    private static QaFinding CreateRowDifferenceWarning(
+        int totalDataRows,
+        int importedRecordCount,
+        int signedDifference,
+        long absoluteDifference,
+        string? explanation)
+    {
+        string description =
+            $"Total Data Rows: {totalDataRows}; Imported Record Count: {importedRecordCount}; signed raw-minus-imported difference: {signedDifference}; absolute difference: {absoluteDifference}.";
+
+        return new QaFinding
+        {
+            FindingId = QaFindingIds.RowDifferenceStatisticWarning,
+            Severity = QaFindingSeverity.Warning,
+            Title = "Raw and imported record counts differ by 10 or more",
+            Description = AppendExplanation(description, explanation),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.DatabaseComparison
+        };
+    }
+
+    private static QaFinding CreateRejectedRecordsWarning(
+        int rejectedRecordCount,
+        QaCheckResult result)
+    {
+        string description =
+            $"{rejectedRecordCount} database records were rejected, reviewed, and accounted for with a passing checklist result.";
+
+        return new QaFinding
+        {
+            FindingId = QaFindingIds.RejectedRecordsStatisticWarning,
+            RelatedCheckId =
+                QaChecklistIds.Database.RejectedRecordsAccountedFor,
+            Severity = QaFindingSeverity.Warning,
+            Title = "Rejected database records were reviewed",
+            Description = AppendExplanation(description, result.Notes),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.DatabaseComparison
+        };
+    }
+
+    private bool IsStatisticFieldApplicable(
+        string fieldId,
+        QaFileCharacteristics characteristics)
+    {
+        return statisticFieldDefinitionsById.TryGetValue(
+                fieldId,
+                out QaStatisticFieldDefinition? definition)
+            && QaStatisticFieldCatalog.IsApplicable(
+                definition,
+                characteristics);
+    }
+
+    private static int GetDerivedNonblankCount(
+        QaStatistics statistics,
+        string fieldId)
+    {
+        QaBlankValueStatistic? blankStatistic = statistics.BlankValues
+            .FirstOrDefault(
+                statistic => statistic is not null
+                    && string.Equals(
+                        statistic.FieldId,
+                        fieldId,
+                        StringComparison.Ordinal));
+
+        return blankStatistic is null
+            ? 0
+            : QaStatisticsCalculationService.CalculateDerivedNonblankCount(
+                blankStatistic);
+    }
+
+    private static string AppendExplanation(
+        string description,
+        string? explanation)
+    {
+        string? trimmedExplanation = TrimToNull(explanation);
+        return trimmedExplanation is null
+            ? description
+            : $"{description} Explanation: {trimmedExplanation}";
+    }
+
+    private static string FormatPercentage(decimal percentage)
+    {
+        return percentage.ToString("0.00", CultureInfo.InvariantCulture);
     }
 
     private static void AddExpected(
@@ -399,24 +795,120 @@ public sealed class QaFindingSynchronizationService
         return definitionsById;
     }
 
+    private static Dictionary<string, QaStatisticFieldDefinition>
+        ValidateAndIndexStatisticDefinitions(
+            IReadOnlyList<QaStatisticFieldDefinition> definitions,
+            IReadOnlyDictionary<string, QaCheckDefinition>
+                checklistDefinitionsById)
+    {
+        Dictionary<string, QaStatisticFieldDefinition> definitionsById =
+            new(StringComparer.Ordinal);
+
+        foreach (QaStatisticFieldDefinition? definition in definitions)
+        {
+            if (definition is null)
+            {
+                throw new ArgumentException(
+                    "The statistic field definition snapshot cannot contain null entries.",
+                    nameof(definitions));
+            }
+
+            if (string.IsNullOrWhiteSpace(definition.Id))
+            {
+                throw new ArgumentException(
+                    "Every statistic field definition must have a nonblank stable ID.",
+                    nameof(definitions));
+            }
+
+            if (string.IsNullOrWhiteSpace(definition.DisplayName))
+            {
+                throw new ArgumentException(
+                    $"Statistic field definition '{definition.Id}' must have a nonblank display name.",
+                    nameof(definitions));
+            }
+
+            if (!Enum.IsDefined(
+                    typeof(QaStatisticFieldApplicability),
+                    definition.Applicability))
+            {
+                throw new ArgumentException(
+                    $"Statistic field definition '{definition.Id}' has an unknown applicability value.",
+                    nameof(definitions));
+            }
+
+            if (definition.RelatedChecklistId is not null
+                && string.IsNullOrWhiteSpace(definition.RelatedChecklistId))
+            {
+                throw new ArgumentException(
+                    $"Statistic field definition '{definition.Id}' has an invalid related checklist ID.",
+                    nameof(definitions));
+            }
+
+            if (definition.RelatedChecklistId is not null
+                && !checklistDefinitionsById.ContainsKey(
+                    definition.RelatedChecklistId))
+            {
+                throw new ArgumentException(
+                    $"Statistic field definition '{definition.Id}' references unknown checklist ID '{definition.RelatedChecklistId}'.",
+                    nameof(definitions));
+            }
+
+            if (!definitionsById.TryAdd(definition.Id, definition))
+            {
+                throw new ArgumentException(
+                    $"The statistic field definition snapshot contains duplicate stable ID '{definition.Id}'.",
+                    nameof(definitions));
+            }
+        }
+
+        return definitionsById;
+    }
+
     private static HashSet<string> CreateManagedFindingIds(
-        IEnumerable<QaCheckDefinition> definitions)
+        IEnumerable<QaCheckDefinition> checklistDefinitions,
+        IEnumerable<QaStatisticFieldDefinition> statisticFieldDefinitions)
     {
         HashSet<string> ids = new(StringComparer.Ordinal)
         {
             QaFindingIds.FullNameCharacteristicWarning,
             QaFindingIds.MoreThanTwoMonetaryColumnsCharacteristicWarning,
-            QaFindingIds.MultipleConfirmationCandidatesCharacteristicWarning
+            QaFindingIds.MultipleConfirmationCandidatesCharacteristicWarning,
+            QaFindingIds.UnusualAverageRateStatisticWarning,
+            QaFindingIds.UnusualStayValueStatisticWarning,
+            QaFindingIds.HighStayValueStatisticWarning,
+            QaFindingIds.RowDifferenceStatisticWarning,
+            QaFindingIds.RejectedRecordsStatisticWarning
         };
 
-        foreach (QaCheckDefinition definition in definitions)
+        foreach (QaCheckDefinition definition in checklistDefinitions)
         {
             if (!ids.Add(QaFindingIds.FailureForCheck(definition.Id))
                 || !ids.Add(QaFindingIds.WarningForCheck(definition.Id)))
             {
                 throw new ArgumentException(
                     $"Checklist ID '{definition.Id}' collides with a deterministic finding ID.",
-                    nameof(definitions));
+                    nameof(checklistDefinitions));
+            }
+        }
+
+        foreach (QaStatisticFieldDefinition definition in statisticFieldDefinitions)
+        {
+            if (definition.SupportsBlankStatistics
+                && !ids.Add(
+                    QaFindingIds.WarningForBlankStatistic(definition.Id)))
+            {
+                throw new ArgumentException(
+                    $"Statistic field ID '{definition.Id}' collides with a deterministic blank-statistic finding ID.",
+                    nameof(statisticFieldDefinitions));
+            }
+
+            if (definition.SupportsBrokenDataStatistics
+                && !ids.Add(
+                    QaFindingIds.FailureForBrokenStatistic(definition.Id)))
+            {
+                throw new ArgumentException(
+                    $"Statistic field ID '{definition.Id}' collides with a deterministic broken-data finding ID.",
+                    nameof(statisticFieldDefinitions));
             }
         }
 
@@ -501,6 +993,31 @@ public sealed class QaFindingSynchronizationService
         }
 
         return findingsById;
+    }
+
+    private static QaStatistics GetStatistics(QaReport report)
+    {
+        QaStatistics statistics = report.Statistics
+            ?? throw new InvalidOperationException(
+                "The QA report must have statistics before findings can be synchronized.");
+
+        _ = statistics.FileInformation
+            ?? throw new InvalidOperationException(
+                "The QA report statistics must have file information.");
+        _ = statistics.UnusualAverageRateValues
+            ?? throw new InvalidOperationException(
+                "The QA report statistics must have unusual Average Rate values.");
+        _ = statistics.UnusualStayValues
+            ?? throw new InvalidOperationException(
+                "The QA report statistics must have unusual Stay Value values.");
+        _ = statistics.HighStayValues
+            ?? throw new InvalidOperationException(
+                "The QA report statistics must have high Stay Value values.");
+        _ = statistics.Database
+            ?? throw new InvalidOperationException(
+                "The QA report statistics must have database statistics.");
+
+        return statistics;
     }
 
     private static QaFileCharacteristics GetFileCharacteristics(QaReport report)

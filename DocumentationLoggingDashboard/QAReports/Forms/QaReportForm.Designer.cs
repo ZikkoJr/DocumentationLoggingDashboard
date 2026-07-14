@@ -12,6 +12,7 @@ partial class QaReportForm
     private TabPage reportDetailsTabPage;
     private TabPage rawFileTabPage;
     private TabPage databaseTabPage;
+    private TabPage statisticsReadinessTabPage;
     private TabPage findingsTabPage;
     private Panel reportDetailsScrollPanel;
     private TableLayoutPanel reportDetailsLayoutPanel;
@@ -66,6 +67,7 @@ partial class QaReportForm
     private RadioButton noRejectedRecordsRadioButton;
     private FlowLayoutPanel rawChecklistFlowLayoutPanel;
     private FlowLayoutPanel databaseChecklistFlowLayoutPanel;
+    private QaStatisticsControl statisticsControl;
     private TableLayoutPanel findingsLayoutPanel;
     private GroupBox warningsGroupBox;
     private FlowLayoutPanel warningsFlowLayoutPanel;
@@ -75,6 +77,7 @@ partial class QaReportForm
     private Label noFailedChecksLabel;
     private FlowLayoutPanel actionFlowLayoutPanel;
     private Button closeButton;
+    private Button checkReportReadinessButton;
 
     protected override void Dispose(bool disposing)
     {
@@ -149,6 +152,8 @@ partial class QaReportForm
         rawChecklistFlowLayoutPanel = new FlowLayoutPanel();
         databaseTabPage = new TabPage();
         databaseChecklistFlowLayoutPanel = new FlowLayoutPanel();
+        statisticsReadinessTabPage = new TabPage();
+        statisticsControl = new QaStatisticsControl();
         findingsTabPage = new TabPage();
         findingsLayoutPanel = new TableLayoutPanel();
         warningsGroupBox = new GroupBox();
@@ -159,6 +164,7 @@ partial class QaReportForm
         noFailedChecksLabel = new Label();
         actionFlowLayoutPanel = new FlowLayoutPanel();
         closeButton = new Button();
+        checkReportReadinessButton = new Button();
         mainLayoutPanel.SuspendLayout();
         reportTabControl.SuspendLayout();
         reportDetailsTabPage.SuspendLayout();
@@ -185,6 +191,7 @@ partial class QaReportForm
         rejectedRecordsFlowLayoutPanel.SuspendLayout();
         rawFileTabPage.SuspendLayout();
         databaseTabPage.SuspendLayout();
+        statisticsReadinessTabPage.SuspendLayout();
         findingsTabPage.SuspendLayout();
         findingsLayoutPanel.SuspendLayout();
         warningsGroupBox.SuspendLayout();
@@ -229,6 +236,7 @@ partial class QaReportForm
         reportTabControl.Controls.Add(reportDetailsTabPage);
         reportTabControl.Controls.Add(rawFileTabPage);
         reportTabControl.Controls.Add(databaseTabPage);
+        reportTabControl.Controls.Add(statisticsReadinessTabPage);
         reportTabControl.Controls.Add(findingsTabPage);
         reportTabControl.Dock = DockStyle.Fill;
         reportTabControl.Location = new Point(15, 87);
@@ -846,6 +854,7 @@ partial class QaReportForm
         rejectedRecordsGroupBox.AutoSize = true;
         rejectedRecordsGroupBox.Controls.Add(rejectedRecordsFlowLayoutPanel);
         rejectedRecordsGroupBox.Dock = DockStyle.Fill;
+        rejectedRecordsGroupBox.Enabled = false;
         rejectedRecordsGroupBox.Location = new Point(489, 295);
         rejectedRecordsGroupBox.MinimumSize = new Size(0, 100);
         rejectedRecordsGroupBox.Name = "rejectedRecordsGroupBox";
@@ -853,7 +862,7 @@ partial class QaReportForm
         rejectedRecordsGroupBox.Size = new Size(480, 100);
         rejectedRecordsGroupBox.TabIndex = 5;
         rejectedRecordsGroupBox.TabStop = false;
-        rejectedRecordsGroupBox.Text = "Rejected database records";
+        rejectedRecordsGroupBox.Text = "Rejected database records (driven by Database Statistics)";
         //
         // rejectedRecordsFlowLayoutPanel
         //
@@ -936,6 +945,25 @@ partial class QaReportForm
         databaseChecklistFlowLayoutPanel.TabIndex = 0;
         databaseChecklistFlowLayoutPanel.WrapContents = false;
         //
+        // statisticsReadinessTabPage
+        //
+        statisticsReadinessTabPage.Controls.Add(statisticsControl);
+        statisticsReadinessTabPage.Location = new Point(4, 24);
+        statisticsReadinessTabPage.Name = "statisticsReadinessTabPage";
+        statisticsReadinessTabPage.Padding = new Padding(8);
+        statisticsReadinessTabPage.Size = new Size(1022, 562);
+        statisticsReadinessTabPage.TabIndex = 3;
+        statisticsReadinessTabPage.Text = "Statistics && Readiness";
+        statisticsReadinessTabPage.UseVisualStyleBackColor = true;
+        //
+        // statisticsControl
+        //
+        statisticsControl.Dock = DockStyle.Fill;
+        statisticsControl.Location = new Point(8, 8);
+        statisticsControl.Name = "statisticsControl";
+        statisticsControl.Size = new Size(1006, 546);
+        statisticsControl.TabIndex = 0;
+        //
         // findingsTabPage
         //
         findingsTabPage.Controls.Add(findingsLayoutPanel);
@@ -943,7 +971,7 @@ partial class QaReportForm
         findingsTabPage.Name = "findingsTabPage";
         findingsTabPage.Padding = new Padding(8);
         findingsTabPage.Size = new Size(1022, 562);
-        findingsTabPage.TabIndex = 3;
+        findingsTabPage.TabIndex = 4;
         findingsTabPage.Text = "Findings";
         findingsTabPage.UseVisualStyleBackColor = true;
         //
@@ -1037,6 +1065,7 @@ partial class QaReportForm
         // actionFlowLayoutPanel
         //
         actionFlowLayoutPanel.Controls.Add(closeButton);
+        actionFlowLayoutPanel.Controls.Add(checkReportReadinessButton);
         actionFlowLayoutPanel.Dock = DockStyle.Fill;
         actionFlowLayoutPanel.FlowDirection = FlowDirection.RightToLeft;
         actionFlowLayoutPanel.Location = new Point(15, 683);
@@ -1055,6 +1084,16 @@ partial class QaReportForm
         closeButton.TabIndex = 0;
         closeButton.Text = "Close";
         closeButton.UseVisualStyleBackColor = true;
+        //
+        // checkReportReadinessButton
+        //
+        checkReportReadinessButton.Location = new Point(751, 6);
+        checkReportReadinessButton.Margin = new Padding(3, 6, 3, 3);
+        checkReportReadinessButton.Name = "checkReportReadinessButton";
+        checkReportReadinessButton.Size = new Size(180, 30);
+        checkReportReadinessButton.TabIndex = 1;
+        checkReportReadinessButton.Text = "Check Report Readiness";
+        checkReportReadinessButton.UseVisualStyleBackColor = true;
         //
         // QaReportForm
         //
@@ -1111,6 +1150,7 @@ partial class QaReportForm
         rejectedRecordsFlowLayoutPanel.PerformLayout();
         rawFileTabPage.ResumeLayout(false);
         databaseTabPage.ResumeLayout(false);
+        statisticsReadinessTabPage.ResumeLayout(false);
         findingsTabPage.ResumeLayout(false);
         findingsLayoutPanel.ResumeLayout(false);
         warningsGroupBox.ResumeLayout(false);

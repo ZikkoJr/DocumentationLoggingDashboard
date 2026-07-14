@@ -3,11 +3,12 @@ using DocumentationLoggingDashboard.QAReports.Definitions;
 using DocumentationLoggingDashboard.QAReports.Forms.Controls;
 using DocumentationLoggingDashboard.QAReports.Models;
 using DocumentationLoggingDashboard.QAReports.Services;
+using DocumentationLoggingDashboard.QAReports.Validation;
 
 namespace DocumentationLoggingDashboard.QAReports.Forms;
 
 /// <summary>
-/// Owns and synchronizes one in-memory Phase 6 QA report draft.
+/// Owns and synchronizes one in-memory QA report draft through readiness review.
 /// </summary>
 public partial class QaReportForm : Form
 {
@@ -22,10 +23,15 @@ public partial class QaReportForm : Form
     private readonly Dictionary<string, QaFindingItemControl> findingControlsById =
         new(StringComparer.Ordinal);
     private readonly QaFindingSynchronizationService findingSynchronizationService;
+    private readonly QaStatisticsCalculationService statisticsCalculationService = new();
+    private readonly QaReportValidationService reportValidationService = new();
 
     private IReadOnlyList<QaPmsMetadata> pmsSystems;
     private IReadOnlyList<QaHotelMetadata> hotels;
     private bool isSynchronizingFindings;
+    private bool isInitializingPhase7 = true;
+    private bool isCheckingReportReadiness;
+    private bool hasReadinessResult;
 
     public QaReportForm(
         QaMetadataService metadataService,
@@ -47,6 +53,7 @@ public partial class QaReportForm : Form
             checklistDefinitions);
 
         InitializeComponent();
+        statisticsControl.Bind(CurrentReport);
         InitializeReportInputs();
         BuildChecklistControls();
         WireEvents();
@@ -55,6 +62,8 @@ public partial class QaReportForm : Form
         SynchronizeHotelSelection();
         SynchronizeReportInputs();
         SynchronizeFileCharacteristics();
+        isInitializingPhase7 = false;
+        statisticsControl.RefreshFromReport();
     }
 
     /// <summary>
@@ -62,6 +71,20 @@ public partial class QaReportForm : Form
     /// Closing the form does not persist this object.
     /// </summary>
     public QaReport CurrentReport { get; }
+
+    /// <summary>
+    /// Gets the most recent non-stale readiness result, or null until the report is
+    /// checked again after an edit.
+    /// </summary>
+    public QaReportValidationResult? LastReadinessResult { get; private set; }
+
+    /// <summary>
+    /// Gets the trimmed QA person or the approved team fallback without mutating
+    /// <see cref="QaReport.CreatedBy"/>.
+    /// </summary>
+    public string EffectiveCreatedBy =>
+        TrimToNull(CurrentReport.CreatedBy)
+        ?? QaReportValidationService.DefaultEffectiveCreatedBy;
 
     private static IReadOnlyList<QaPmsMetadata> CreatePmsSnapshot(
         IReadOnlyList<QaPmsMetadata> source)
@@ -233,6 +256,8 @@ public partial class QaReportForm : Form
             ResizeFindingControls(warningsFlowLayoutPanel);
         failedChecksFlowLayoutPanel.SizeChanged += (_, _) =>
             ResizeFindingControls(failedChecksFlowLayoutPanel);
+
+        WirePhase7Events();
     }
 
     private void SynchronizeReportInputs()
@@ -249,11 +274,13 @@ public partial class QaReportForm : Form
         CurrentReport.HotelInformation.FileMonth = new QaFileMonth(
             fileMonthPicker.Value.Year,
             fileMonthPicker.Value.Month);
+        InvalidateReportReadiness();
     }
 
     private void SynchronizeQaDate()
     {
         CurrentReport.QaDate = DateOnly.FromDateTime(qaDatePicker.Value);
+        InvalidateReportReadiness();
     }
 
     private void SynchronizeHotelSelection()
@@ -268,6 +295,7 @@ public partial class QaReportForm : Form
             hotelInformation.PmsName = string.Empty;
             selectedHotelIdTextBox.Clear();
             selectedPmsTextBox.Clear();
+            InvalidateReportReadiness();
             return;
         }
 
@@ -276,6 +304,7 @@ public partial class QaReportForm : Form
         hotelInformation.PmsName = selectedHotel.PmsName;
         selectedHotelIdTextBox.Text = selectedHotel.HotelId;
         selectedPmsTextBox.Text = selectedHotel.PmsName;
+        InvalidateReportReadiness();
     }
 
     private void OpenMetadataManagement()
@@ -442,6 +471,8 @@ public partial class QaReportForm : Form
         {
             isSynchronizingFindings = false;
         }
+
+        InvalidateReportReadiness();
     }
 
     private void SynchronizeCharacteristicsWhenChecked(RadioButton radioButton)
@@ -479,13 +510,13 @@ public partial class QaReportForm : Form
                 multipleConfirmationCandidatesRadioButton.Checked;
             characteristics.IsCustomScriptSupportAvailable =
                 customScriptAvailableRadioButton.Checked;
-            characteristics.HasRejectedDatabaseRecords =
-                rejectedRecordsExistRadioButton.Checked;
+            SynchronizeRejectedRecordsCharacteristicFromStatistics();
 
             moreThanTwoMonetaryColumnsNoteLabel.Visible =
                 characteristics.MonetaryColumnScenario ==
                     QaMonetaryColumnScenario.MoreThanTwoMonetaryColumns;
 
+            statisticsCalculationService.Synchronize(CurrentReport);
             ApplyChecklistApplicability();
             SynchronizeFindingsAndRefreshUiCore();
         }
@@ -493,6 +524,8 @@ public partial class QaReportForm : Form
         {
             isSynchronizingFindings = false;
         }
+
+        InvalidateReportReadiness();
     }
 
     private void ApplyChecklistApplicability()
@@ -535,9 +568,11 @@ public partial class QaReportForm : Form
 
     private void SynchronizeFindingsAndRefreshUiCore()
     {
+        statisticsCalculationService.Synchronize(CurrentReport);
         findingSynchronizationService.SynchronizeFindings(CurrentReport);
         SynchronizeChecklistWarningControls();
         RefreshFindingControls();
+        statisticsControl.RefreshFromReport();
     }
 
     private void SynchronizeChecklistWarningControls()
@@ -663,6 +698,7 @@ public partial class QaReportForm : Form
         }
 
         SynchronizeFindingsAndRefreshUi();
+        InvalidateReportReadiness();
     }
 
     private static int GetFindingControlWidth(FlowLayoutPanel panel)
@@ -684,6 +720,149 @@ public partial class QaReportForm : Form
         {
             itemControl.Width = width;
         }
+    }
+
+    private void WirePhase7Events()
+    {
+        createdByTextBox.TextChanged += (_, _) => InvalidateReportReadiness();
+        originalFileNameTextBox.TextChanged += (_, _) =>
+            InvalidateReportReadiness();
+        generalNotesTextBox.TextChanged += (_, _) =>
+            InvalidateReportReadiness();
+        statisticsControl.StatisticsChanged +=
+            StatisticsControl_StatisticsChanged;
+        checkReportReadinessButton.Click += (_, _) =>
+            CheckReportReadiness();
+    }
+
+    private void StatisticsControl_StatisticsChanged(
+        object? sender,
+        EventArgs eventArgs)
+    {
+        if (isSynchronizingFindings || isCheckingReportReadiness)
+        {
+            return;
+        }
+
+        isSynchronizingFindings = true;
+
+        try
+        {
+            statisticsControl.CommitCurrentValues();
+            statisticsCalculationService.Synchronize(CurrentReport);
+            SynchronizeRejectedRecordsCharacteristicFromStatistics();
+            ApplyChecklistApplicability();
+            SynchronizeFindingsAndRefreshUiCore();
+        }
+        finally
+        {
+            isSynchronizingFindings = false;
+        }
+
+        InvalidateReportReadiness();
+    }
+
+    private void SynchronizeRejectedRecordsCharacteristicFromStatistics()
+    {
+        int rejectedRecordCount = CurrentReport.Statistics.Database
+            .RejectedRecordCount;
+        bool hasRejectedRecords = rejectedRecordCount > 0;
+
+        CurrentReport.FileCharacteristics.HasRejectedDatabaseRecords =
+            hasRejectedRecords;
+        rejectedRecordsExistRadioButton.Checked = hasRejectedRecords;
+        noRejectedRecordsRadioButton.Checked = !hasRejectedRecords;
+    }
+
+    private void CheckReportReadiness()
+    {
+        if (isCheckingReportReadiness || isSynchronizingFindings)
+        {
+            return;
+        }
+
+        isCheckingReportReadiness = true;
+
+        try
+        {
+            SynchronizeHotelSelection();
+            SynchronizeReportInputs();
+            statisticsControl.CommitCurrentValues();
+            SynchronizeFileCharacteristics();
+
+            QaReportValidationResult result =
+                reportValidationService.Validate(CurrentReport, hotels);
+
+            CurrentReport.ReportStatus = result.IsReady
+                ? result.CalculatedStatus
+                : null;
+            LastReadinessResult = result;
+            hasReadinessResult = true;
+            reportTabControl.SelectedTab = statisticsReadinessTabPage;
+            statisticsControl.ShowReadinessResult(result);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            CurrentReport.ReportStatus = null;
+            hasReadinessResult = true;
+            QaReportValidationResult failureResult =
+                CreateUnexpectedReadinessFailureResult();
+            LastReadinessResult = failureResult;
+            reportTabControl.SelectedTab = statisticsReadinessTabPage;
+            statisticsControl.ShowReadinessResult(failureResult);
+        }
+        finally
+        {
+            isCheckingReportReadiness = false;
+        }
+    }
+
+    private QaReportValidationResult CreateUnexpectedReadinessFailureResult()
+    {
+        string? createdBy = TrimToNull(CurrentReport.CreatedBy);
+        List<string> workflowWarnings = [];
+
+        if (createdBy is null)
+        {
+            workflowWarnings.Add(
+                QaReportValidationService.MissingCreatedByWarning);
+        }
+
+        int warningCount = CurrentReport.Findings.Count(
+            finding => finding is not null
+                && finding.Severity == QaFindingSeverity.Warning);
+        int failureCount = CurrentReport.Findings.Count(
+            finding => finding is not null
+                && finding.Severity == QaFindingSeverity.Failure);
+        int handledCount = CurrentReport.Findings.Count(
+            finding => finding is not null
+                && finding.Resolution != QaFindingResolution.Active);
+
+        return new QaReportValidationResult(
+            ["The report could not be synchronized for readiness because its in-memory data is internally inconsistent."],
+            workflowWarnings,
+            calculatedStatus: null,
+            createdBy ?? QaReportValidationService.DefaultEffectiveCreatedBy,
+            warningCount,
+            failureCount,
+            handledCount);
+    }
+
+    private void InvalidateReportReadiness()
+    {
+        CurrentReport.ReportStatus = null;
+        LastReadinessResult = null;
+
+        if (isInitializingPhase7
+            || isCheckingReportReadiness
+            || isSynchronizingFindings
+            || !hasReadinessResult)
+        {
+            return;
+        }
+
+        statisticsControl.MarkReadinessStale();
     }
 
     private static string? TrimToNull(string? value)
