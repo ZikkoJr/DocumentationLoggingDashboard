@@ -18,6 +18,8 @@ partial class MainForm
     private TableLayoutPanel logTypeLayoutPanel;
     private Label logTypeLabel;
     private ComboBox logTypeComboBox;
+    private FlowLayoutPanel qaActionFlowLayoutPanel;
+    private Button createQaReportButton;
     private Button manageQaHotelsPmsButton;
     private SplitContainer contentSplitContainer;
     private Panel fieldsScrollPanel;
@@ -64,6 +66,8 @@ partial class MainForm
         logTypeLayoutPanel = new TableLayoutPanel();
         logTypeLabel = new Label();
         logTypeComboBox = new ComboBox();
+        qaActionFlowLayoutPanel = new FlowLayoutPanel();
+        createQaReportButton = new Button();
         manageQaHotelsPmsButton = new Button();
         contentSplitContainer = new SplitContainer();
         fieldsScrollPanel = new Panel();
@@ -80,6 +84,7 @@ partial class MainForm
         mainLayoutPanel.SuspendLayout();
         documentationFolderLayoutPanel.SuspendLayout();
         logTypeLayoutPanel.SuspendLayout();
+        qaActionFlowLayoutPanel.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)contentSplitContainer).BeginInit();
         contentSplitContainer.Panel1.SuspendLayout();
         contentSplitContainer.Panel2.SuspendLayout();
@@ -206,7 +211,7 @@ partial class MainForm
         logTypeLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         logTypeLayoutPanel.Controls.Add(logTypeLabel, 0, 0);
         logTypeLayoutPanel.Controls.Add(logTypeComboBox, 1, 0);
-        logTypeLayoutPanel.Controls.Add(manageQaHotelsPmsButton, 2, 0);
+        logTypeLayoutPanel.Controls.Add(qaActionFlowLayoutPanel, 2, 0);
         logTypeLayoutPanel.Dock = DockStyle.Fill;
         logTypeLayoutPanel.Location = new Point(19, 169);
         logTypeLayoutPanel.Name = "logTypeLayoutPanel";
@@ -236,13 +241,36 @@ partial class MainForm
         logTypeComboBox.Size = new Size(240, 23);
         logTypeComboBox.TabIndex = 1;
         //
+        // qaActionFlowLayoutPanel
+        //
+        qaActionFlowLayoutPanel.Controls.Add(manageQaHotelsPmsButton);
+        qaActionFlowLayoutPanel.Controls.Add(createQaReportButton);
+        qaActionFlowLayoutPanel.Dock = DockStyle.Fill;
+        qaActionFlowLayoutPanel.FlowDirection = FlowDirection.RightToLeft;
+        qaActionFlowLayoutPanel.Location = new Point(352, 0);
+        qaActionFlowLayoutPanel.Margin = new Padding(0);
+        qaActionFlowLayoutPanel.Name = "qaActionFlowLayoutPanel";
+        qaActionFlowLayoutPanel.Size = new Size(710, 38);
+        qaActionFlowLayoutPanel.TabIndex = 2;
+        qaActionFlowLayoutPanel.WrapContents = false;
+        //
+        // createQaReportButton
+        //
+        createQaReportButton.Location = new Point(371, 4);
+        createQaReportButton.Margin = new Padding(3, 4, 3, 3);
+        createQaReportButton.Name = "createQaReportButton";
+        createQaReportButton.Size = new Size(150, 30);
+        createQaReportButton.TabIndex = 0;
+        createQaReportButton.Text = "Create QA Report";
+        createQaReportButton.UseVisualStyleBackColor = true;
+        //
         // manageQaHotelsPmsButton
         //
-        manageQaHotelsPmsButton.Anchor = AnchorStyles.Right;
-        manageQaHotelsPmsButton.Location = new Point(879, 4);
+        manageQaHotelsPmsButton.Location = new Point(527, 4);
+        manageQaHotelsPmsButton.Margin = new Padding(3, 4, 3, 3);
         manageQaHotelsPmsButton.Name = "manageQaHotelsPmsButton";
         manageQaHotelsPmsButton.Size = new Size(180, 30);
-        manageQaHotelsPmsButton.TabIndex = 2;
+        manageQaHotelsPmsButton.TabIndex = 1;
         manageQaHotelsPmsButton.Text = "Manage QA Hotels / PMS";
         manageQaHotelsPmsButton.UseVisualStyleBackColor = true;
         // 
@@ -406,6 +434,7 @@ partial class MainForm
         documentationFolderLayoutPanel.PerformLayout();
         logTypeLayoutPanel.ResumeLayout(false);
         logTypeLayoutPanel.PerformLayout();
+        qaActionFlowLayoutPanel.ResumeLayout(false);
         contentSplitContainer.Panel1.ResumeLayout(false);
         contentSplitContainer.Panel2.ResumeLayout(false);
         contentSplitContainer.Panel2.PerformLayout();
