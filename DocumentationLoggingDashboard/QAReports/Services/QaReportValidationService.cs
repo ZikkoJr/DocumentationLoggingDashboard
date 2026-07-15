@@ -96,6 +96,10 @@ public sealed class QaReportValidationService
             findingsById.Values,
             hasBlockingErrors: errors.Count != 0);
 
+        string? validatedReportFingerprint = errors.Count == 0
+            ? QaReportReadinessFingerprint.Compute(report)
+            : null;
+
         return new QaReportValidationResult(
             errors,
             workflowWarnings,
@@ -103,7 +107,8 @@ public sealed class QaReportValidationService
             effectiveCreatedBy,
             warningCount,
             failureCount,
-            handledCount);
+            handledCount,
+            validatedReportFingerprint);
     }
 
     private static void ValidateZeroRowContext(

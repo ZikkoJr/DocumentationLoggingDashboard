@@ -15,6 +15,27 @@ public sealed class QaReportValidationResult
         int warningFindingCount,
         int failureFindingCount,
         int handledFindingCount)
+        : this(
+            blockingErrors,
+            workflowWarnings,
+            calculatedStatus,
+            effectiveCreatedBy,
+            warningFindingCount,
+            failureFindingCount,
+            handledFindingCount,
+            validatedReportFingerprint: null)
+    {
+    }
+
+    public QaReportValidationResult(
+        IReadOnlyList<string> blockingErrors,
+        IReadOnlyList<string> workflowWarnings,
+        QaReportStatus? calculatedStatus,
+        string effectiveCreatedBy,
+        int warningFindingCount,
+        int failureFindingCount,
+        int handledFindingCount,
+        string? validatedReportFingerprint)
     {
         ArgumentNullException.ThrowIfNull(blockingErrors);
         ArgumentNullException.ThrowIfNull(workflowWarnings);
@@ -51,6 +72,10 @@ public sealed class QaReportValidationResult
         WarningFindingCount = warningFindingCount;
         FailureFindingCount = failureFindingCount;
         HandledFindingCount = handledFindingCount;
+        ValidatedReportFingerprint = string.IsNullOrWhiteSpace(
+                validatedReportFingerprint)
+            ? null
+            : validatedReportFingerprint;
     }
 
     public bool IsReady { get; }
@@ -68,4 +93,11 @@ public sealed class QaReportValidationResult
     public int FailureFindingCount { get; }
 
     public int HandledFindingCount { get; }
+
+    /// <summary>
+    /// Gets the deterministic fingerprint of the ready report state validated by
+    /// <c>QaReportValidationService</c>. Older callers that use the original
+    /// constructor intentionally receive no readiness evidence.
+    /// </summary>
+    public string? ValidatedReportFingerprint { get; }
 }
