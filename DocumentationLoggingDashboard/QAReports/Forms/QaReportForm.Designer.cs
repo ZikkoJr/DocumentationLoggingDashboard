@@ -78,6 +78,7 @@ partial class QaReportForm
     private FlowLayoutPanel actionFlowLayoutPanel;
     private Button closeButton;
     private Button checkReportReadinessButton;
+    private Button generateAndSaveQaReportButton;
 
     protected override void Dispose(bool disposing)
     {
@@ -165,6 +166,7 @@ partial class QaReportForm
         actionFlowLayoutPanel = new FlowLayoutPanel();
         closeButton = new Button();
         checkReportReadinessButton = new Button();
+        generateAndSaveQaReportButton = new Button();
         mainLayoutPanel.SuspendLayout();
         reportTabControl.SuspendLayout();
         reportDetailsTabPage.SuspendLayout();
@@ -1066,6 +1068,7 @@ partial class QaReportForm
         //
         actionFlowLayoutPanel.Controls.Add(closeButton);
         actionFlowLayoutPanel.Controls.Add(checkReportReadinessButton);
+        actionFlowLayoutPanel.Controls.Add(generateAndSaveQaReportButton);
         actionFlowLayoutPanel.Dock = DockStyle.Fill;
         actionFlowLayoutPanel.FlowDirection = FlowDirection.RightToLeft;
         actionFlowLayoutPanel.Location = new Point(15, 683);
@@ -1094,6 +1097,16 @@ partial class QaReportForm
         checkReportReadinessButton.TabIndex = 1;
         checkReportReadinessButton.Text = "Check Report Readiness";
         checkReportReadinessButton.UseVisualStyleBackColor = true;
+        //
+        // generateAndSaveQaReportButton
+        //
+        generateAndSaveQaReportButton.Location = new Point(525, 6);
+        generateAndSaveQaReportButton.Margin = new Padding(3, 6, 3, 3);
+        generateAndSaveQaReportButton.Name = "generateAndSaveQaReportButton";
+        generateAndSaveQaReportButton.Size = new Size(220, 30);
+        generateAndSaveQaReportButton.TabIndex = 2;
+        generateAndSaveQaReportButton.Text = "Generate and Save QA Report";
+        generateAndSaveQaReportButton.UseVisualStyleBackColor = true;
         //
         // QaReportForm
         //

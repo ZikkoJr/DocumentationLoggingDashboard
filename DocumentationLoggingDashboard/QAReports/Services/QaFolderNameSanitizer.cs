@@ -137,6 +137,41 @@ public sealed class QaFolderNameSanitizer
         return true;
     }
 
+    /// <summary>
+    /// Validates a complete generated Windows filename without applying the
+    /// metadata folder's 100-character or repeated-underscore policy.
+    /// </summary>
+    public bool IsSafeGeneratedFileName(
+        string? fileName,
+        int maximumLength)
+    {
+        if (maximumLength < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumLength),
+                "A positive generated-filename length limit is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName)
+            || fileName.Length > maximumLength
+            || IsDotDirectoryName(fileName)
+            || Path.IsPathRooted(fileName)
+            || fileName.EndsWith('.')
+            || fileName.EndsWith(' ')
+            || IsReservedWindowsDeviceName(fileName)
+            || !string.Equals(
+                Path.GetFileName(fileName),
+                fileName,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return !fileName.Any(character =>
+            char.IsWhiteSpace(character)
+            || IsInvalidWindowsFileNameCharacter(character));
+    }
+
     private static bool IsInvalidWindowsFileNameCharacter(char character)
     {
         return char.IsControl(character)

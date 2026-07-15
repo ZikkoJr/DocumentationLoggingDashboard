@@ -355,7 +355,8 @@ public partial class MainForm : Form
             using QaReportForm form = new(
                 dependencies.MetadataService,
                 dependencies.PmsSystems,
-                dependencies.Hotels);
+                dependencies.Hotels,
+                dependencies.Paths);
             form.ShowDialog(this);
         }
         catch (QaUnsupportedMetadataSchemaException ex)
@@ -401,7 +402,8 @@ public partial class MainForm : Form
     private (
         QaMetadataService MetadataService,
         IReadOnlyList<QaPmsMetadata> PmsSystems,
-        IReadOnlyList<QaHotelMetadata> Hotels) CreateQaWorkflowDependencies()
+        IReadOnlyList<QaHotelMetadata> Hotels,
+        QaStoragePaths Paths) CreateQaWorkflowDependencies()
     {
         string documentationRoot = settingsService.GetDocumentationRootFolder();
         QaStoragePaths paths = new(documentationRoot);
@@ -413,7 +415,7 @@ public partial class MainForm : Form
         IReadOnlyList<QaPmsMetadata> pmsSystems = metadataService.LoadPmsSystems();
         IReadOnlyList<QaHotelMetadata> hotels = metadataService.LoadHotels();
 
-        return (metadataService, pmsSystems, hotels);
+        return (metadataService, pmsSystems, hotels, paths);
     }
 
     private void ChangeLogsFolder()

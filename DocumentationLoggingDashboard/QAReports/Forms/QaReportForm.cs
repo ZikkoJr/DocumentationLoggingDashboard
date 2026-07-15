@@ -8,13 +8,19 @@ using DocumentationLoggingDashboard.QAReports.Validation;
 namespace DocumentationLoggingDashboard.QAReports.Forms;
 
 /// <summary>
-/// Owns and synchronizes one in-memory QA report draft through readiness review.
+/// Owns and synchronizes one in-memory QA report draft through readiness review
+/// and the paired QA report save workflow.
 /// </summary>
 public partial class QaReportForm : Form
 {
     private const int ExpectedChecklistDefinitionCount = 28;
+    private const int MaximumOverwriteFilenamesPerLocation = 3;
+    private const int MaximumDisplayedFilenameLength = 100;
+    private const int DisplayedFilenameSuffixLength = 30;
 
     private readonly QaMetadataService metadataService;
+    private readonly QaReportSaveService reportSaveService;
+    private readonly QaPdfGenerationService pdfGenerationService = new();
     private readonly IReadOnlyList<QaCheckDefinition> checklistDefinitions;
     private readonly IReadOnlyDictionary<string, QaCheckDefinition> checklistDefinitionsById;
     private readonly Dictionary<string, QaCheckResult> checklistResultsById;
@@ -31,15 +37,22 @@ public partial class QaReportForm : Form
     private bool isSynchronizingFindings;
     private bool isInitializingPhase7 = true;
     private bool isCheckingReportReadiness;
+    private bool isSavingQaReport;
     private bool hasReadinessResult;
 
     public QaReportForm(
         QaMetadataService metadataService,
         IReadOnlyList<QaPmsMetadata> pmsSystems,
-        IReadOnlyList<QaHotelMetadata> hotels)
+        IReadOnlyList<QaHotelMetadata> hotels,
+        QaStoragePaths paths)
     {
         this.metadataService = metadataService
             ?? throw new ArgumentNullException(nameof(metadataService));
+        ArgumentNullException.ThrowIfNull(paths);
+        reportSaveService = new QaReportSaveService(
+            paths,
+            this.metadataService,
+            new QaFolderNameSanitizer());
         this.pmsSystems = CreatePmsSnapshot(pmsSystems);
         this.hotels = CreateHotelSnapshot(hotels);
         checklistDefinitions = QaChecklistCatalog.Definitions.ToArray();
@@ -256,6 +269,8 @@ public partial class QaReportForm : Form
             ResizeFindingControls(warningsFlowLayoutPanel);
         failedChecksFlowLayoutPanel.SizeChanged += (_, _) =>
             ResizeFindingControls(failedChecksFlowLayoutPanel);
+        generateAndSaveQaReportButton.Click += (_, _) =>
+            GenerateAndSaveQaReport();
 
         WirePhase7Events();
     }
@@ -776,9 +791,19 @@ public partial class QaReportForm : Form
 
     private void CheckReportReadiness()
     {
-        if (isCheckingReportReadiness || isSynchronizingFindings)
+        if (isSavingQaReport)
         {
             return;
+        }
+
+        _ = RunFreshReadinessCheck();
+    }
+
+    private QaReportValidationResult? RunFreshReadinessCheck()
+    {
+        if (isCheckingReportReadiness || isSynchronizingFindings)
+        {
+            return null;
         }
 
         isCheckingReportReadiness = true;
@@ -796,26 +821,440 @@ public partial class QaReportForm : Form
             CurrentReport.ReportStatus = result.IsReady
                 ? result.CalculatedStatus
                 : null;
-            LastReadinessResult = result;
-            hasReadinessResult = true;
-            reportTabControl.SelectedTab = statisticsReadinessTabPage;
-            statisticsControl.ShowReadinessResult(result);
+            DisplayReadinessResult(result);
+            return result;
         }
         catch (Exception exception)
         {
             Debug.WriteLine(exception);
             CurrentReport.ReportStatus = null;
-            hasReadinessResult = true;
             QaReportValidationResult failureResult =
                 CreateUnexpectedReadinessFailureResult();
-            LastReadinessResult = failureResult;
-            reportTabControl.SelectedTab = statisticsReadinessTabPage;
-            statisticsControl.ShowReadinessResult(failureResult);
+            DisplayReadinessResult(failureResult);
+            return failureResult;
         }
         finally
         {
             isCheckingReportReadiness = false;
         }
+    }
+
+    private void DisplayReadinessResult(QaReportValidationResult result)
+    {
+        LastReadinessResult = result;
+        hasReadinessResult = true;
+        reportTabControl.SelectedTab = statisticsReadinessTabPage;
+        statisticsControl.ShowReadinessResult(result);
+    }
+
+    private void GenerateAndSaveQaReport()
+    {
+        if (isSavingQaReport)
+        {
+            return;
+        }
+
+        isSavingQaReport = true;
+        bool generateButtonWasEnabled = generateAndSaveQaReportButton.Enabled;
+        bool readinessButtonWasEnabled = checkReportReadinessButton.Enabled;
+        generateAndSaveQaReportButton.Enabled = false;
+        checkReportReadinessButton.Enabled = false;
+
+        try
+        {
+            QaReportValidationResult? validationResult =
+                RunFreshReadinessCheck();
+
+            if (validationResult is null
+                || !IsReadyForPdfGeneration(validationResult))
+            {
+                ShowReportNotReady();
+                return;
+            }
+
+            if (!ConfirmEffectiveCreatedBy(validationResult))
+            {
+                return;
+            }
+
+            // Keep this explicit gate immediately beside the rendering boundary.
+            if (!IsReadyForPdfGeneration(validationResult))
+            {
+                ShowReportNotReady();
+                return;
+            }
+
+            DateTimeOffset generatedAt = DateTimeOffset.UtcNow;
+            byte[] pdfBytes = pdfGenerationService.GeneratePdf(
+                CurrentReport,
+                validationResult,
+                generatedAt);
+
+            QaReportSaveRequest request = new(
+                CurrentReport,
+                validationResult,
+                generatedAt);
+            var preparation = reportSaveService.Prepare(request);
+            bool overwriteConfirmed = false;
+
+            if (preparation.ExistingFiles.HasMatches)
+            {
+                overwriteConfirmed =
+                    ConfirmExistingReportOverwrite(preparation);
+
+                if (!overwriteConfirmed)
+                {
+                    return;
+                }
+            }
+
+            var saveResult = reportSaveService.Save(
+                preparation,
+                pdfBytes,
+                overwriteConfirmed);
+
+            if (saveResult.Cancelled)
+            {
+                return;
+            }
+
+            if (!saveResult.Success
+                || !saveResult.IndexUpdated
+                || saveResult.ManualReviewRequired)
+            {
+                ShowUnsuccessfulQaReportSaveResult(saveResult);
+                return;
+            }
+
+            ShowQaReportSaveSuccess(saveResult);
+        }
+        catch (QaPdfGenerationException exception)
+        {
+            Debug.WriteLine(exception);
+            MessageBox.Show(
+                this,
+                "The QA report PDF could not be generated.\r\n\r\n" +
+                    exception.Message,
+                "QA Report Generation Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        catch (QaReportIndexException exception)
+        {
+            Debug.WriteLine(exception);
+            MessageBox.Show(
+                this,
+                "The QA report index could not be updated. The new report copies were not kept.",
+                "QA Report Save Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        catch (QaReportSaveException exception)
+        {
+            ShowQaReportSaveFailure(exception);
+        }
+        catch (QaMetadataException exception)
+        {
+            Debug.WriteLine(exception);
+            MessageBox.Show(
+                this,
+                "The saved Hotel or PMS information changed while this report was open. Refresh the report details and try again.",
+                "QA Report Save Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            MessageBox.Show(
+                this,
+                "The QA report could not be saved because an unexpected error occurred. No success was recorded.",
+                "QA Report Save Failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            generateAndSaveQaReportButton.Enabled = generateButtonWasEnabled;
+            checkReportReadinessButton.Enabled = readinessButtonWasEnabled;
+            isSavingQaReport = false;
+        }
+    }
+
+    private bool IsReadyForPdfGeneration(
+        QaReportValidationResult validationResult)
+    {
+        return validationResult.IsReady
+            && validationResult.BlockingErrors.Count == 0
+            && validationResult.CalculatedStatus is not null
+            && CurrentReport.ReportStatus == validationResult.CalculatedStatus
+            && !string.IsNullOrWhiteSpace(
+                validationResult.ValidatedReportFingerprint);
+    }
+
+    private void ShowReportNotReady()
+    {
+        reportTabControl.SelectedTab = statisticsReadinessTabPage;
+        MessageBox.Show(
+            this,
+            "The QA report is not ready to be generated. Review the listed validation errors.",
+            "QA Report Not Ready",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+    }
+
+    private bool ConfirmEffectiveCreatedBy(
+        QaReportValidationResult validationResult)
+    {
+        if (!string.IsNullOrWhiteSpace(CurrentReport.CreatedBy))
+        {
+            return true;
+        }
+
+        DialogResult response = MessageBox.Show(
+            this,
+            "This QA report does not have an assigned QA person.\r\n\r\n" +
+                "The generated PDF and QA index will use:\r\n" +
+                validationResult.EffectiveCreatedBy +
+                "\r\n\r\nDo you want to continue?",
+            "Created By Not Assigned",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        return response == DialogResult.Yes;
+    }
+
+    private bool ConfirmExistingReportOverwrite(
+        QaReportSavePreparation preparation)
+    {
+        List<string> lines =
+        [
+            "A QA report already exists for this Hotel and File Month.",
+            string.Empty,
+            $"Hotel: {NormalizeDialogValue(preparation.HotelName)} / {NormalizeDialogValue(preparation.HotelId)}",
+            $"PMS: {NormalizeDialogValue(preparation.PmsName)}",
+            $"File Month: {preparation.FileMonth}",
+            string.Empty
+        ];
+
+        AppendExistingFileSummary(
+            lines,
+            "Hotel location",
+            preparation.ExistingFiles.HotelFilePaths);
+        AppendExistingFileSummary(
+            lines,
+            "PMS location",
+            preparation.ExistingFiles.PmsFilePaths);
+
+        if (preparation.ExistingFiles.IsInconsistent)
+        {
+            lines.Add(string.Empty);
+            lines.Add(
+                "The existing Hotel and PMS report copies are inconsistent.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("Do you want to overwrite the existing QA report?");
+
+        DialogResult response = MessageBox.Show(
+            this,
+            string.Join("\r\n", lines),
+            "Replace Existing QA Report",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        return response == DialogResult.Yes;
+    }
+
+    private static void AppendExistingFileSummary(
+        ICollection<string> lines,
+        string locationLabel,
+        IReadOnlyList<string> filePaths)
+    {
+        lines.Add($"{locationLabel}: {filePaths.Count} file(s)");
+
+        foreach (string filePath in filePaths
+                     .Take(MaximumOverwriteFilenamesPerLocation))
+        {
+            string filename = Path.GetFileName(filePath) ?? "Existing QA report";
+            lines.Add($"  {AbbreviateFilename(filename)}");
+        }
+
+        int additionalCount =
+            filePaths.Count - MaximumOverwriteFilenamesPerLocation;
+        if (additionalCount > 0)
+        {
+            lines.Add($"  ... and {additionalCount} more");
+        }
+    }
+
+    private static string AbbreviateFilename(string filename)
+    {
+        if (filename.Length <= MaximumDisplayedFilenameLength)
+        {
+            return filename;
+        }
+
+        int prefixLength = MaximumDisplayedFilenameLength
+            - DisplayedFilenameSuffixLength
+            - 1;
+        if (char.IsHighSurrogate(filename[prefixLength - 1]))
+        {
+            prefixLength--;
+        }
+
+        int suffixStart = filename.Length - DisplayedFilenameSuffixLength;
+        if (char.IsLowSurrogate(filename[suffixStart]))
+        {
+            suffixStart++;
+        }
+
+        return filename[..prefixLength] + "\u2026" + filename[suffixStart..];
+    }
+
+    private void ShowQaReportSaveSuccess(QaReportSaveResult result)
+    {
+        List<string> lines =
+        [
+            "The QA report was saved successfully.",
+            string.Empty,
+            $"Filename: {result.FinalFilename}",
+            $"Hotel copy: {result.HotelCopyPath}",
+            $"PMS copy: {result.PmsCopyPath}",
+            $"Status: {FormatReportStatus(result.FinalStatus)}",
+            $"Existing report replaced: {(result.OverwriteOccurred ? "Yes" : "No")}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(result.CleanupWarning))
+        {
+            lines.Add(string.Empty);
+            lines.Add("Cleanup warning: " + result.CleanupWarning);
+        }
+
+        MessageBox.Show(
+            this,
+            string.Join("\r\n", lines),
+            "QA Report Saved",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+    }
+
+    private void ShowUnsuccessfulQaReportSaveResult(
+        QaReportSaveResult result)
+    {
+        string message = result.ManualReviewRequired
+            ? "The QA report save failed and the previous state could not be fully restored. Manual review of the Hotel and PMS QA report folders is required."
+            : !result.IndexUpdated
+                ? "The QA report index could not be updated. The new report copies were not kept."
+                : "The QA report could not be saved to both required locations. No success was recorded.";
+
+        MessageBox.Show(
+            this,
+            message,
+            "QA Report Save Failed",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
+    }
+
+    private void ShowQaReportSaveFailure(QaReportSaveException exception)
+    {
+        Debug.WriteLine(exception);
+
+        string message;
+
+        if (exception.ManualReviewRequired)
+        {
+            message =
+                "The QA report save failed and the previous state could not be fully restored. Manual review of the Hotel and PMS QA report folders is required.";
+
+            if (exception.ManualReviewLocations.Count > 0)
+            {
+                string locations = string.Join(
+                    "\r\n",
+                    exception.ManualReviewLocations
+                        .Take(3)
+                        .Select(path => "- " + AbbreviateFilename(
+                            NormalizeDialogValue(path))));
+                message += "\r\n\r\nReview locations:\r\n" + locations;
+            }
+        }
+        else
+        {
+            message = exception.ErrorCategory switch
+            {
+                QaReportSaveErrorCategory.MetadataMismatch =>
+                    "The saved Hotel or PMS information changed while this report was open. Refresh the report details and try again.",
+                QaReportSaveErrorCategory.FileInUse =>
+                    "The existing QA report could not be replaced because one of its files is currently in use.",
+                QaReportSaveErrorCategory.PermissionDenied =>
+                    "The QA report could not be written to the configured documentation folder.",
+                QaReportSaveErrorCategory.IndexFailure =>
+                    "The QA report index could not be updated. The new report copies were not kept.",
+                QaReportSaveErrorCategory.ReportNotReady
+                    or QaReportSaveErrorCategory.StaleReadiness =>
+                    "The QA report is not ready to be generated. Review the listed validation errors.",
+                QaReportSaveErrorCategory.FilenameFailure
+                    or QaReportSaveErrorCategory.InvalidDestination =>
+                    "The QA report filename or configured destination is not safe for saving.",
+                QaReportSaveErrorCategory.OverwriteRequired
+                    or QaReportSaveErrorCategory.ConcurrentChange =>
+                    "The existing QA report files changed before the save could be completed. Review the report folders and try again.",
+                QaReportSaveErrorCategory.RollbackFailure =>
+                    "The QA report save failed and the previous state could not be fully restored. Manual review of the Hotel and PMS QA report folders is required.",
+                _ when exception.PreviousStateRestored =>
+                    "The QA report could not be saved to both required locations. The previous report files were restored.",
+                _ =>
+                    "The QA report could not be saved to both required locations. No success was recorded."
+            };
+        }
+
+        if (exception.ErrorCategory is QaReportSaveErrorCategory.ReportNotReady
+            or QaReportSaveErrorCategory.StaleReadiness)
+        {
+            reportTabControl.SelectedTab = statisticsReadinessTabPage;
+        }
+
+        MessageBox.Show(
+            this,
+            message,
+            "QA Report Save Failed",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
+    }
+
+    private static string NormalizeDialogValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "-";
+        }
+
+        string controlsReplaced = new(value
+            .Select(character => char.IsControl(character) ? ' ' : character)
+            .ToArray());
+        string normalized = string.Join(
+            " ",
+            controlsReplaced.Split(
+                (char[]?)null,
+                StringSplitOptions.RemoveEmptyEntries));
+
+        return AbbreviateFilename(normalized);
+    }
+
+    private static string FormatReportStatus(QaReportStatus status)
+    {
+        return status switch
+        {
+            QaReportStatus.Pass => "Pass",
+            QaReportStatus.PassWithWarnings => "Pass with Warnings",
+            QaReportStatus.Fail => "Fail",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(status),
+                status,
+                "Unknown QA report status.")
+        };
     }
 
     private QaReportValidationResult CreateUnexpectedReadinessFailureResult()
