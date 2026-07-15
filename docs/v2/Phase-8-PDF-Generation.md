@@ -12,12 +12,12 @@ Phase 9 must call the renderer exactly once for a ready report and reuse the sam
 
 - Required and active branch: `v2-qa-reports`.
 - Approved Phase 7 implementation: `f61a5264336cb969b5310a2d6ba61434149f9bc6`.
-- Approved Phase 8 starting tip: `305629412297469cd26000e8bfe1989747fa359f`.
-- Actual starting and current working-tree commit: `305629412297469cd26000e8bfe1989747fa359f`.
+- Phase 8 starting commit: `305629412297469cd26000e8bfe1989747fa359f`.
+- Initial Phase 8 implementation and corrective-follow-up starting commit: `59570184dbb5204d9c0917b7a0e5e8e5be087027`.
 - Approved Phase 2 commit: `7d94a27a4569f8ca521aeaa6c08da0e510fc4dc7`.
 - Approved Phase 1 commit: `49beaa1f45700725d328ade215419254560cb406`.
 
-The Phase 7, Phase 2, and Phase 1 ancestry checks passed before editing. The worktree was initially clean and recent history was inspected. Nothing was committed or pushed during Phase 8.
+The Phase 8, Phase 7, Phase 2, and Phase 1 ancestry checks passed before the corrective follow-up. The follow-up began from a clean worktree at `59570184dbb5204d9c0917b7a0e5e8e5be087027`, and recent history was inspected. The initial Phase 8 implementation was committed and pushed as `59570184dbb5204d9c0917b7a0e5e8e5be087027` on `v2-qa-reports`.
 
 ## PDF library decision
 
@@ -162,13 +162,13 @@ PDF metadata is intentionally limited to:
 
 The readiness fingerprint, report ID, original path components, guest/reservation data, and destination details are not metadata fields.
 
-Section and subsection headings keep with following content. Short key/value and finding tables stay together where possible. Finding blocks do not split during the tested long-report layout. Checklist header rows repeat on continuation pages. Long text wraps, and the generated test set had no clipped text, overlap, missing section, blank trailing page, or incorrect page total.
+Section and subsection headings keep with following content. Short key/value and ordinary one-chunk finding tables stay together where possible. Oversized Description and Resolution Notes values are split at whitespace-aware boundaries into continuation rows bounded to 900 source characters and 16 logical CR/LF line breaks per row. The finding table can then flow across pages while its title remains with the first narrative row where practical. Checklist header rows repeat on continuation pages. Long text wraps, and the final generated test set had no clipped text, overlap, missing section, blank trailing page, or incorrect page total.
 
 ## Verification record
 
 ### Builds and package restore
 
-The untouched baseline command was:
+The initial Phase 8 untouched baseline command was:
 
 ```powershell
 dotnet build DocumentationLoggingDashboard.sln
@@ -176,9 +176,11 @@ dotnet build DocumentationLoggingDashboard.sln
 
 Result: exit code 0, build succeeded, 0 warnings, and 0 errors in 9.02 seconds.
 
+The corrective follow-up began with the same exact command at commit `59570184dbb5204d9c0917b7a0e5e8e5be087027`. That untouched baseline also succeeded with exit code 0, 0 warnings, and 0 errors, in 5.53 seconds.
+
 The approved package restore succeeded after the workspace sandbox's inability to read the user-level NuGet configuration was handled with approved access. No other direct package was added.
 
-Post-edit Debug and Release gates used:
+The initial Phase 8 post-edit Debug and Release gates used:
 
 ```powershell
 dotnet build DocumentationLoggingDashboard.sln
@@ -234,6 +236,40 @@ Text and metadata extraction performed 191 independent checks covering section o
 Fourteen temporary PDFs totaling 37 pages were rendered with Poppler at 120 DPI and every rendered page was inspected. The set included all filename variants and every status/finding/long-report scenario. Inspection checked margins, headings, grayscale tables, line wrapping, safe long words, repeated checklist headers, Warning/Failure separation, handled Failure placement, footer text and page totals, finding-block pagination, notes, clipping/overlap, and blank trailing pages.
 
 An initial visual pass found a File Month table and some finding blocks splitting poorly. Row padding/keep behavior was adjusted, the harness was rerun, all PDFs were rerendered, and the final pages were inspected again. The final rendered set showed no clipping, overlap, missing section, split finding block, incorrect page count, or blank trailing page.
+
+### Oversized single-finding corrective verification
+
+This follow-up added a targeted test because the initial many-finding pagination run did not prove that one user-entered Description or Resolution Notes value taller than a page could flow safely. A disposable harness under `%LOCALAPPDATA%\Temp\Phase8OversizedFindingVerification-019f66463fdf` used the real `QaReport`, checklist catalog, statistics/finding synchronization services, `QaReportValidationService`, resulting `QaReportValidationResult`, and `QaPdfGenerationService`. It used only synthetic data and the deterministic generation timestamp `2026-07-15 16:45:30 -04:00`; readiness was not bypassed.
+
+The committed renderer forced every finding row and the full finding table to stay together. Its first targeted run returned structurally valid PDFs, but all three required cases were only six pages and visual inspection showed an isolated finding heading followed by an oversized narrative row overflowing into the footer/printable boundary. Indexed text was missing from extraction, so a production correction was required. The only production file changed for pagination was `DocumentationLoggingDashboard/QAReports/Pdf/QaPdfDocumentBuilder.cs`.
+
+The focused correction keeps ordinary one-chunk finding tables on the existing grouped path. Only an oversized narrative is divided into bounded continuation rows; those tables may page-break, with the title kept with the first narrative row. Character and explicit-line-break bounds are both applied so a short-character-count value containing many returns cannot remain an indivisible over-tall row.
+
+| Scenario | Synthetic shape | Original result | Corrected result and page span |
+| --- | --- | --- | --- |
+| A - Description | One active Warning; 47,863-character Description with 520 indexed segments | 6 pages; overflow and missing extracted segments | 9 pages; Description spans pages 3-9; following Notes section appears on page 9 |
+| B - Resolution Notes | One handled Warning; 43-character Description, custom script name, and 48,385-character Resolution Notes with 520 indexed segments | 6 pages; overflow and missing extracted segments | 9 pages; Resolution Notes span pages 3-9; following Notes section appears on page 9 |
+| C - both fields | One handled Failure; 35,903-character Description with 390 indexed segments and 36,295-character Resolution Notes with 390 indexed segments, followed by another Failure | 6 pages; overflow and missing extracted segments | 13 pages; Description spans pages 3-8, Resolution Notes span pages 8-13, and the following finding and Notes section appear on page 13 |
+| D - explicit line breaks | One active Warning; 718-character Description containing 120 indexed CR/LF-delimited lines | Added after source review to exercise the line-count edge case | 4 pages; Description spans pages 3-4 and the following Notes section appears on page 4 |
+
+The harness completed 32 binary, refusal, repository-isolation, and report-snapshot assertions. Every successful payload was nonempty, began with `%PDF-`, had `%%EOF` near its end, and left its source report unchanged. A direct applicable `NotEvaluated` case was refused without mutation. Repository PDF count was unchanged, no repository QA index was created, and all outputs stayed under the disposable harness directory.
+
+Poppler rendered all 31 pages from the three required corrected PDFs and all four pages from the explicit-line-break case at 120 DPI. Every page and each in-finding transition was visually inspected. No corrected page showed clipping, overlap, missing content, a completely blank page, an incorrect footer total, a blank trailing page, or a premature ending. Text extraction completed 4,062 checks: all 1,820 indexed long-text segments and all 120 explicit-line tokens occurred exactly once in their expected page ranges, and the checks also covered following content, footer identity/privacy fields, Pass/Pass with Warnings/Fail regression content, checklist output, and ordinary/many-finding pagination.
+
+Regression PDFs contained a 2-page Pass report, a 2-page ordinary short-finding Pass with Warnings report, and a 7-page Fail report with 24 normal-sized findings. They preserved short-block grouping, the 18-Warning-only summary, Failure placement under Failed Checks, complete Raw File QA and DB QA tables, `N/A`, separate Blank and Broken Data tables, conditional General Notes, and correct page footers. The tested range is the concrete synthetic set above; this is not a guarantee for arbitrary or infinite input.
+
+The corrective follow-up's final Debug and Release commands were:
+
+```powershell
+dotnet build DocumentationLoggingDashboard.sln
+dotnet build DocumentationLoggingDashboard.sln -c Release
+```
+
+Debug succeeded with exit code 0, 0 warnings, and 0 errors in 1.48 seconds. Release succeeded with exit code 0, 0 warnings, and 0 errors in 2.59 seconds. The required `publish-windows.ps1` command's first sandboxed run could not read the existing user-level `NuGet.Config`; because the script still exits 0 and prints completion text after that internal failure, it was not accepted as success. The approved-access rerun showed restore, Release build, and output-path completion and succeeded with exit code 0, with no warning or error emitted.
+
+The successful publish output contained the single-file `DocumentationLoggingDashboard.exe`, `DocumentationLoggingDashboard.pdb`, `appsettings.json`, and the pre-existing `DocumentationLogs` directory. It contained no generated PDF, loose PDFsharp/MigraDoc assembly, font file, or unexpected PDF dependency. The 20-file pre-existing ignored publish baseline was restored after inspection and all restored SHA-256 hashes matched the backup.
+
+After verification and publish-baseline restoration, the disposable harness directory and all generated PDFs/rendered pages under it were removed.
 
 ### Regression evidence and limitations
 

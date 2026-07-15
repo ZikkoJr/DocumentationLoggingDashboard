@@ -13,6 +13,9 @@ internal sealed class QaPdfDocumentBuilder
     private const string PrivacyReminder =
         "Do not include guest names, guest emails, payment data, credentials, or full hotel-file contents in QA reports.";
 
+    private const int MaximumFindingNarrativeChunkLength = 900;
+    private const int MaximumFindingNarrativeLineBreaksPerChunk = 16;
+
     private static readonly IReadOnlyDictionary<string, int> ChecklistOrder =
         QaChecklistCatalog.Definitions
             .Select((definition, index) => new { definition.Id, Index = index })
@@ -524,14 +527,27 @@ internal sealed class QaPdfDocumentBuilder
         AddSectionHeading(section, title);
         foreach (QaFinding finding in findings)
         {
+            IReadOnlyList<string> descriptionChunks =
+                SplitFindingNarrative(finding.Description);
+            string? resolutionNotes = TrimToNull(finding.ResolutionNotes);
+            IReadOnlyList<string> resolutionNoteChunks = resolutionNotes is null
+                ? []
+                : SplitFindingNarrative(resolutionNotes);
+            bool requiresPagination = descriptionChunks.Count > 1
+                || resolutionNoteChunks.Count > 1;
+
             Paragraph heading = section.AddParagraph();
             heading.Style = QaPdfStyles.FindingHeading;
             heading.AddText(
                 $"{FormatSeverity(finding.Severity)} - {FormatResolution(finding.Resolution)}");
 
             Table details = CreateKeyValueTable(section, 4.4, 13.6);
+            details.KeepTogether = !requiresPagination;
             AddKeyValueRow(details, "Title", finding.Title, emphasize: true);
-            AddKeyValueRow(details, "Description", finding.Description);
+            AddFindingNarrativeRows(
+                details,
+                "Description",
+                descriptionChunks);
 
             string? relatedCheck = GetRelatedChecklistDisplayName(
                 finding.RelatedCheckId);
@@ -551,12 +567,24 @@ internal sealed class QaPdfDocumentBuilder
                 AddKeyValueRow(details, "Custom Script Name", scriptName);
             }
 
-            if (TrimToNull(finding.ResolutionNotes) is string resolutionNotes)
+            if (resolutionNoteChunks.Count > 0)
             {
-                AddKeyValueRow(details, "Resolution Notes", resolutionNotes);
+                AddFindingNarrativeRows(
+                    details,
+                    "Resolution Notes",
+                    resolutionNoteChunks);
             }
 
-            KeepRowsTogether(details);
+            if (requiresPagination)
+            {
+                // Keep the bounded title and first narrative chunk with the
+                // finding heading, while allowing later narrative rows to flow.
+                details.Rows[0].KeepWith = 1;
+            }
+            else
+            {
+                KeepRowsTogether(details);
+            }
 
             Paragraph spacer = section.AddParagraph();
             spacer.Format.SpaceAfter = Unit.FromPoint(2);
@@ -641,6 +669,108 @@ internal sealed class QaPdfDocumentBuilder
             row.Cells[1].Format.Font.Bold = true;
             row.Cells[1].Format.Font.Size = Unit.FromPoint(9.2);
         }
+    }
+
+    private static void AddFindingNarrativeRows(
+        Table table,
+        string label,
+        IReadOnlyList<string> chunks)
+    {
+        for (int index = 0; index < chunks.Count; index++)
+        {
+            string rowLabel = index == 0
+                ? label
+                : label + " (continued)";
+            AddKeyValueRow(table, rowLabel, chunks[index]);
+        }
+    }
+
+    private static IReadOnlyList<string> SplitFindingNarrative(string? value)
+    {
+        string narrative = value ?? "-";
+
+        List<string> chunks = [];
+        int start = 0;
+
+        while (start < narrative.Length)
+        {
+            int hardEnd = Math.Min(
+                start + MaximumFindingNarrativeChunkLength,
+                narrative.Length);
+            if (hardEnd < narrative.Length
+                && narrative[hardEnd - 1] == '\r'
+                && narrative[hardEnd] == '\n')
+            {
+                hardEnd--;
+            }
+
+            int end = FindLineBoundedChunkEnd(narrative, start, hardEnd);
+
+            if (end == hardEnd && end < narrative.Length)
+            {
+                for (int index = end - 1; index > start; index--)
+                {
+                    if (char.IsWhiteSpace(narrative[index]))
+                    {
+                        int candidate = index + 1;
+                        if (narrative[index] == '\r'
+                            && candidate < narrative.Length
+                            && narrative[candidate] == '\n')
+                        {
+                            candidate++;
+                        }
+
+                        if (candidate <= hardEnd)
+                        {
+                            end = candidate;
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            chunks.Add(narrative[start..end]);
+            start = end;
+        }
+
+        if (chunks.Count == 0)
+        {
+            chunks.Add(narrative);
+        }
+
+        return chunks;
+    }
+
+    private static int FindLineBoundedChunkEnd(
+        string narrative,
+        int start,
+        int hardEnd)
+    {
+        int lineBreaks = 0;
+        for (int index = start; index < hardEnd; index++)
+        {
+            char character = narrative[index];
+            if (character != '\r' && character != '\n')
+            {
+                continue;
+            }
+
+            if (lineBreaks == MaximumFindingNarrativeLineBreaksPerChunk)
+            {
+                return index;
+            }
+
+            lineBreaks++;
+            if (character == '\r'
+                && index + 1 < hardEnd
+                && narrative[index + 1] == '\n')
+            {
+                index++;
+            }
+        }
+
+        return hardEnd;
     }
 
     private static void AddStatisticMeasureRow(
