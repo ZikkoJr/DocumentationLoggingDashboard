@@ -11,6 +11,17 @@ Write-Host "Output folder: $outputFolder"
 Write-Host ""
 
 dotnet publish $projectPath -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $outputFolder
+$publishExitCode = $LASTEXITCODE
+
+if ($publishExitCode -ne 0) {
+    [Console]::Error.WriteLine("dotnet publish failed with exit code $publishExitCode.")
+    exit $publishExitCode
+}
+
+if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
+    [Console]::Error.WriteLine("dotnet publish reported success, but the expected executable was not created: $exePath")
+    exit 1
+}
 
 Write-Host ""
 Write-Host "Publish complete."

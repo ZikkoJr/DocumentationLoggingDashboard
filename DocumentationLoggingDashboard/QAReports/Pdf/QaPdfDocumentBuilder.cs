@@ -498,15 +498,23 @@ internal sealed class QaPdfDocumentBuilder
                      .Where(definition => definition.Section == checklistSection))
         {
             QaCheckResult result = resultsById[definition.Id];
-            Row row = table.AddRow();
-            AddCellText(row.Cells[0], definition.DisplayName);
-            AddCellText(row.Cells[1], FormatCheckStatus(result.Status));
-
             string details = TrimToNull(result.Notes)
                 ?? (result.Status == QaCheckStatus.NotApplicable
                     ? "Not applicable to the selected file configuration."
                     : "-");
-            AddCellText(row.Cells[2], details);
+            IReadOnlyList<string> detailChunks = SplitFindingNarrative(details);
+
+            for (int index = 0; index < detailChunks.Count; index++)
+            {
+                Row row = table.AddRow();
+                AddCellText(
+                    row.Cells[0],
+                    index == 0
+                        ? definition.DisplayName
+                        : definition.DisplayName + " (continued)");
+                AddCellText(row.Cells[1], FormatCheckStatus(result.Status));
+                AddCellText(row.Cells[2], detailChunks[index]);
+            }
         }
     }
 

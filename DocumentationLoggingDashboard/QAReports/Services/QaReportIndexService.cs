@@ -485,9 +485,7 @@ public sealed class QaReportIndexService
 
         foreach (char character in value.Trim())
         {
-            if (char.IsWhiteSpace(character)
-                && (char.IsControl(character)
-                    || character is '\u2028' or '\u2029'))
+            if (char.IsWhiteSpace(character))
             {
                 pendingWhitespaceReplacement = true;
                 continue;

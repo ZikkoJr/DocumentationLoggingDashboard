@@ -761,8 +761,8 @@ public sealed class QaReportSaveService
                 rollbackFailures);
         }
 
-        foreach (BackupRecord backup in state.PmsBackups
-                     .Concat(state.HotelBackups)
+        foreach (BackupRecord backup in state.HotelBackups
+                     .Concat(state.PmsBackups)
                      .Where(backup => backup.Moved)
                      .Reverse())
         {
