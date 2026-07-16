@@ -6,15 +6,16 @@ Phase 9 connects the approved in-memory Phase 8 PDF renderer to the V2 QA Report
 
 The phase does not add a caller-selected path, `SaveFileDialog`, V1 destination, third PDF copy, history browser, repair screen, draft workflow, database, upload, email, spreadsheet export, or background save. The save service accepts only configured `QaStoragePaths`; callers cannot redirect an artifact outside the approved Hotel, PMS, and Index roots.
 
-This document records the implementation and final local verification evidence currently present in the Phase 9 worktree. It does not record approval, a commit, a push, a merge, a tag, or a release.
+This document records the Phase 9 implementation and its focused existing-report detection correction. The original Phase 9 commit was pushed for review, but Phase 9 is not approved, merged, tagged, or released.
 
 ## Approved baseline
 
 - Required and active branch: `v2-qa-reports`.
-- Approved Phase 8 baseline and current committed `HEAD` before the uncommitted Phase 9 edits: `e92d2f72a5015895e801b2f5af8b230a6c132bfd`.
+- Approved Phase 8 baseline: `e92d2f72a5015895e801b2f5af8b230a6c132bfd`.
+- Pushed Phase 9 commit at the start of the detection correction: `42a5b061ae808253dea21affd1b1bdcb6e066b57`.
 - Earlier Phase 8 implementation/follow-up baseline in the recorded ancestry: `59570184dbb5204d9c0917b7a0e5e8e5be087027`.
 - Untouched baseline command: `dotnet build DocumentationLoggingDashboard.sln`.
-- Untouched baseline result: exit code 0, build succeeded, 0 warnings, 0 errors, in 6.24 seconds.
+- Detection-correction pre-edit build result: exit code 0, build succeeded, 0 warnings, 0 errors, in 3.83 seconds.
 
 Phase 9 does not change the target framework, startup model, publish script, or direct package set. The existing `PDFsharp-MigraDoc-GDI` 6.2.4 dependency remains the renderer dependency introduced in Phase 8.
 
@@ -23,6 +24,7 @@ Phase 9 does not change the target framework, startup model, publish script, or 
 Added models:
 
 - `DocumentationLoggingDashboard/QAReports/Models/QaReportExistingFiles.cs`
+- `DocumentationLoggingDashboard/QAReports/Models/QaReportFilenameParts.cs`
 - `DocumentationLoggingDashboard/QAReports/Models/QaReportIndexEntry.cs`
 - `DocumentationLoggingDashboard/QAReports/Models/QaReportKey.cs`
 - `DocumentationLoggingDashboard/QAReports/Models/QaReportSavePreparation.cs`
@@ -33,6 +35,7 @@ Added services and focused exceptions:
 
 - `DocumentationLoggingDashboard/QAReports/Services/QaReportExistingFileService.cs`
 - `DocumentationLoggingDashboard/QAReports/Services/QaReportFilenameService.cs`
+- `DocumentationLoggingDashboard/QAReports/Services/QaReportFilenameParser.cs`
 - `DocumentationLoggingDashboard/QAReports/Services/QaReportIndexException.cs`
 - `DocumentationLoggingDashboard/QAReports/Services/QaReportIndexService.cs`
 - `DocumentationLoggingDashboard/QAReports/Services/QaReportSaveException.cs`
@@ -113,16 +116,26 @@ public sealed class QaReportFilenameService
         QaPmsMetadata canonicalPms);
 }
 
+public sealed class QaReportFilenameParser
+{
+    public QaReportFilenameParser(
+        QaFolderNameSanitizer folderNameSanitizer);
+
+    public bool TryParse(
+        string? filename,
+        out QaReportFilenameParts? parts);
+}
+
 public sealed class QaReportExistingFileService
 {
     public QaReportExistingFileService(
         QaStoragePaths paths,
-        QaReportFilenameService filenameService);
+        QaReportFilenameParser filenameParser);
 
     public QaReportExistingFiles FindExistingFiles(
         QaHotelMetadata canonicalHotel,
         QaPmsMetadata canonicalPms,
-        QaFileMonth fileMonth);
+        QaReportKey reportKey);
 }
 
 public sealed class QaReportIndexService
@@ -132,11 +145,11 @@ public sealed class QaReportIndexService
 }
 ```
 
-The index service also has an internal `PrepareUpdate(QaReportIndexEntry)` operation that retains exact source bytes and builds the complete replacement bytes. `QaReportKey` supports construction, `Parse`, `TryParse`, equality, hashing, and `ToString`. `QaReportExistingFiles` exposes the Hotel and PMS path lists, total count, `HasMatches`, and `IsInconsistent`.
+The index service also has an internal `PrepareUpdate(QaReportIndexEntry)` operation that retains exact source bytes and builds the complete replacement bytes. `QaReportKey` supports construction, `Parse`, `TryParse`, equality, hashing, and `ToString`. `QaReportFilenameParts` exposes the parsed QA Date, three sanitized components, File Month, and derived key. `QaReportExistingFiles` exposes the Hotel and PMS path lists, total count, `HasMatches`, and `IsInconsistent`.
 
 ## Final filename and date semantics
 
-The exact invariant-culture filename is:
+The base semantic filename, and exact invariant-culture unmarked form, is:
 
 ```text
 yyyy-MM-dd_SanitizedHotelName_SanitizedHotelID_SanitizedPMS_yyyy-MM_QAReport.pdf
@@ -148,6 +161,16 @@ For example:
 2026-06-29_ExampleHotel_TEST-001_ExamplePMS_2026-04_QAReport.pdf
 ```
 
+That visually unchanged form is used when none of the three sanitized components contains an underscore. When at least one component contains an underscore, the filename uses a delimiter-safe marked form. Two marker underscores follow the fixed date separator, so the filename begins `yyyy-MM-dd___`; every literal component underscore is then written as `__`, while a single underscore separates fields. For example:
+
+```text
+Hotel Name: Example_Hotel
+Encoded component: Example__Hotel
+Filename: 2026-06-29___Example__Hotel_TEST-001_ExamplePMS_2026-04_QAReport.pdf
+```
+
+The marker is necessary because the original unapproved unmarked format can be ambiguous when component text contains underscores. It distinguishes newly encoded filenames from those old ambiguous names without adding a migration or guessing which split was intended.
+
 The leading `yyyy-MM-dd` is `QaReport.QaDate`: the date the QA review was performed. The later `yyyy-MM` is `QaHotelInformation.FileMonth`: the month represented by the hotel file. These values remain deliberately separate in the filename and index.
 
 File Month, not QA Date, is part of logical replacement identity. A later QA Date for the same Hotel ID and File Month is a replacement candidate and produces a new leading date in the final filename. QA Date is retained as index information and deterministic ordering information, but it is not part of the key.
@@ -156,7 +179,9 @@ Filename inputs are limited to QA Date, canonical Hotel Name, canonical Hotel ID
 
 ### Sanitizer reuse and length policy
 
-Hotel Name, Hotel ID, and PMS Name are independently passed through the existing `QaFolderNameSanitizer.SanitizeLeafName`. That operation trims, removes all whitespace, replaces Windows-invalid filename/control characters with `_`, collapses replacement runs, removes unsafe generated edges, handles Windows device names, limits each component to 100 UTF-16 code units, and avoids splitting a surrogate pair while truncating.
+Hotel Name, Hotel ID, and PMS Name are independently passed through the existing `QaFolderNameSanitizer.SanitizeLeafName` before delimiter encoding. That operation trims, removes all whitespace, replaces Windows-invalid filename/control characters with `_`, collapses replacement runs, removes unsafe generated edges, handles Windows device names, limits each component to 100 UTF-16 code units, and avoids splitting a surrogate pair while truncating. Thus tests involving consecutive or ordinary leading/trailing raw underscores round-trip the sanitizer's canonical result, not the discarded raw edge characters.
+
+Hotel ID is logical identity, so it has a stricter boundary: its sanitized filename component must equal the trimmed canonical Hotel ID ordinally. A Hotel ID that whitespace removal, invalid-character replacement, device-name handling, or truncation would change is refused instead of allowing two distinct logical IDs to collide in a shared PMS directory.
 
 Phase 9 extends the sanitizer with this backward-compatible public validation API:
 
@@ -166,7 +191,7 @@ public bool IsSafeGeneratedFileName(
     int maximumLength);
 ```
 
-It validates a complete generated filename without imposing the stored metadata folder's 100-character and repeated-underscore rules. The complete filename limit is 240 UTF-16 code units. It must be one non-rooted, path-free leaf; contain no whitespace or Windows-invalid/control characters; avoid dot-directory and device-name cases; have no trailing dot or space; and end in exact lowercase `.pdf`. There is no truncation or hash fallback for an overlong complete filename: creation is refused as `FilenameFailure`.
+It validates a complete generated filename without imposing the stored metadata folder's 100-character and repeated-underscore rules. The combined generation policy limits the complete filename to 240 UTF-16 code units and requires one non-rooted, path-free leaf with no whitespace or Windows-invalid/control characters, dot-directory or device-name cases, or trailing dot or space. `QaReportFilenameService` additionally requires the generated name to end in exact lowercase `.pdf`; discovery follows Windows semantics and accepts the PDF extension case-insensitively before enforcing the canonical parsed structure. There is no truncation or hash fallback for an overlong complete filename: creation is refused as `FilenameFailure`.
 
 Every final and transaction path must also be at most 259 UTF-16 code units under the repository's explicit supported Windows path policy. The destination checks are separator-aware, normalize full paths, and use ordinal-ignore-case descendant comparison.
 
@@ -208,19 +233,15 @@ There is no form path textbox, save dialog, caller path parameter, use of the V1
 
 ## Existing-report discovery and overwrite identity
 
-The filesystem, not the index, is the source of truth for overwrite detection. `QaReportExistingFileService` enumerates only the top level of the one canonical Hotel directory and one canonical PMS directory. Each candidate must:
+The filesystem, not the index, is the source of truth for overwrite detection. `QaReportExistingFileService` enumerates only the top level of the one canonical Hotel directory and one canonical PMS directory. Each PDF candidate is passed to `QaReportFilenameParser`, which requires one safe path-free leaf, the `_QAReport.pdf` suffix, an invariant `yyyy-MM-dd` QA Date, an invariant `yyyy-MM` File Month, exactly three nonempty variable components, and a canonical delimiter encoding.
 
-- have a `.pdf` extension by ordinal-ignore-case comparison;
-- have no more than 240 UTF-16 code units in its filename;
-- match a fully anchored, escaped, culture-invariant, ignore-case regular expression with a one-second timeout;
-- contain a leading date that parses exactly as `yyyy-MM-dd`;
-- contain the current sanitized canonical Hotel Name, Hotel ID, and PMS;
-- contain the same File Month; and
-- end in the literal `_QAReport.pdf` suffix.
+Unmarked filenames are accepted only when their three components contain no delimiter underscores, which safely supports visually unchanged prior filenames. Marked filenames decode underscore runs deterministically: `__` is one literal underscore, `_` is a field separator, and the canonical three-underscore boundary represents a separator followed by a sanitizer-produced leading underscore. Noncanonical runs, missing or extra fields, malformed dates/months, wrong suffixes, path separators, temporary/rollback names, and ambiguous unmarked legacy filenames are ignored rather than guessed.
 
-The pattern intentionally allows any valid leading QA Date so an older dated PDF for the same key is found. `Regex.Escape` prevents metadata from becoming pattern syntax. Enumeration is top-level only, and every resulting path is normalized and required to stay in the exact expected leaf directory. Unrelated PDFs, malformed dates, different Hotel/PMS/month components, non-PDF files, directories, and transaction files are ignored. Transaction files never use a `.pdf` extension.
+The parsed candidate matches when and only when its decoded Hotel ID plus File Month equals the current `QaReportKey`. QA Date, Hotel Name, PMS Name, and full filename are excluded from matching identity. Consequently, a prior filename with an older QA Date, Hotel Name, or PMS Name is detected, and the Hotel and PMS destinations may contain different matching filenames. Exact Hotel IDs prevent prefix/substring false matches such as `TEST-001` versus `TEST-0010`, `XTEST-001`, or `TEST-001-OLD`.
 
-Matches are de-duplicated ordinal-ignore-case and sorted by filename and full path. An exact final target that already exists but is not recognized by the locked matcher is an invalid destination, not an overwrite candidate.
+Enumeration is top-level only, and every resulting path is normalized and required to stay in the exact expected leaf directory. Unrelated keys/months, malformed QA report filenames, non-PDF files, directories, and transaction files are ignored. Transaction files never use a `.pdf` extension. Both destination directories remain detection authority; the QA index is a strict summary, not the only source of overwrite evidence.
+
+Matches are de-duplicated ordinal-ignore-case and sorted by filename and full path. An exact final target that already exists but cannot be parsed as a valid current-key filename is an invalid destination, not an overwrite candidate; it is never overwritten or deleted.
 
 `QaReportExistingFiles.IsInconsistent` is true whenever a nonempty state is not exactly one matching PDF in each destination with the same filename under ordinal-ignore-case comparison. It therefore identifies one-sided copies, multiple matches, and differing Hotel/PMS filenames. It is false when no report exists and for the normal one-paired-file state.
 
@@ -386,6 +407,9 @@ The lock is not a cross-process mutex, distributed lease, or filesystem transact
 ## Repository-specific design choices
 
 - The existing sanitizer supplies component generation and now has one general full-filename validator, avoiding a second Windows invalid-character policy.
+- The delimiter marker is used only when a sanitized component contains `_`; filenames without component underscores remain visually unchanged, while marked filenames can be parsed without confusing escaped underscores with field boundaries.
+- Old unmarked filenames are accepted only when they contain exactly three separator-free components. Old underscore-bearing ambiguous filenames are ignored rather than guessed, and there is no migration or repair workflow.
+- Canonical Hotel IDs must be losslessly representable after sanitization because filename discovery in a shared PMS directory cannot safely distinguish two logical IDs that collapse to one component.
 - Preparation and commit are separate because the form must display authoritative filesystem evidence before asking for overwrite permission.
 - The filesystem is overwrite authority; the text index is a strict summary and never overrides current files.
 - A malformed index causes refusal rather than auto-repair because preserving unrelated entries is safer than reconstructing intent.
@@ -397,7 +421,7 @@ The lock is not a cross-process mutex, distributed lease, or filesystem transact
 
 ## Verification record
 
-### Untouched baseline build
+### Detection-correction pre-edit build
 
 Command:
 
@@ -405,7 +429,7 @@ Command:
 dotnet build DocumentationLoggingDashboard.sln
 ```
 
-Result: exit code 0, 0 warnings, 0 errors, 6.24 seconds.
+Result: exit code 0, 0 warnings, 0 errors, 3.83 seconds, with `HEAD` at `42a5b061ae808253dea21affd1b1bdcb6e066b57` and a clean worktree.
 
 ### Directly executed Phase 9 tests
 
@@ -417,15 +441,32 @@ The direct assertions covered real Phase 8 rendering for Pass, Pass with Warning
 
 The injected fault matrix covered Hotel and PMS staging I/O and permission categories, staged-byte corruption, PMS commit failure, index commit failure, successful restoration, an intentionally failed rollback with manual-review signaling, and a cleanup failure that correctly returned committed success plus a warning. UI cancellation/default-No and double-click behavior were not claimed by this harness.
 
+A separate isolated correction harness then built the real application and production services with 0 warnings and 0 errors and reported `PASS scenarios=13 assertions=259`. Its configured documentation roots, build outputs, temporary `InternalsVisibleTo` source, and harness source were outside the repository and were removed afterward.
+
+The correction harness directly verified:
+
+- an older QA Date is detected and confirmed replacement leaves one identical current pair and one key entry;
+- prior Hotel Name and prior PMS Name components are detected even though neither is part of the key;
+- different valid matching filenames in Hotel and PMS destinations are returned by one preparation gate and reconciled together;
+- all multiple stale same-key files are replaced while unrelated PDF paths and bytes remain unchanged;
+- isolated, consecutive, leading, trailing, and repeated-ID-text underscore inputs produce deterministic sanitized/encoded components and parse back to their canonical sanitized values;
+- old underscore-bearing unmarked ambiguity is refused rather than guessed;
+- `TEST-001` does not match `TEST-0010`, `XTEST-001`, or `TEST-001-OLD`, and `2026-04` does not match `2026-05`;
+- malformed dates, months, components, escaping, suffixes, temporary/rollback names, and non-PDF files are ignored and preserved;
+- cancellation by not calling `Save`, plus the service's `overwriteConfirmed: false` guard, leaves PDFs and index byte-for-byte unchanged and creates no transaction artifact;
+- confirmed replacement commits only the current pair/index, while an injected failure after all backups restores every original filename and byte array without false success;
+- malformed ordinary candidates are preserved, and an exact-target directory collision fails safely; and
+- sanitizer-changing Hotel IDs are refused instead of entering lossy filename identity.
+
 ### Source inspection completed
 
-Direct source inspection confirms the contracts and code paths described in this document, including filename construction, key equality, metadata reread, top-level anchored match discovery, strict index parsing/serialization, preparation/commit separation, generate-once form flow, hash verification, commit order, rollback construction, cleanup warnings, and in-process concurrency controls. The form contains one `DateTimeOffset.UtcNow` read and one direct `QaPdfGenerationService.GeneratePdf` call in the save handler; the same `pdfBytes` variable is passed to `Save`.
+Direct source inspection confirms the contracts and code paths described in this document, including filename construction and parsing, key equality, metadata reread, top-level parsed-key discovery, strict index parsing/serialization, preparation/commit separation, generate-once form flow, hash verification, commit order, rollback construction, cleanup warnings, and in-process concurrency controls. The form contains one `DateTimeOffset.UtcNow` read and one direct `QaPdfGenerationService.GeneratePdf` call in the save handler; the same `pdfBytes` variable is passed to `Save`.
 
 Source inspection is not a substitute for executing the transaction fault matrix, visual WinForms checks, publish checks, or end-to-end filesystem assertions.
 
 ### Post-edit Debug build
 
-Status: **Pass — exit code 0, 0 warnings, 0 errors; MSBuild elapsed time 1.37 seconds**
+Status: **Pass for the detection correction — exit code 0, 0 warnings, 0 errors; MSBuild elapsed time 1.11 seconds**
 
 Command:
 
@@ -435,7 +476,7 @@ dotnet build DocumentationLoggingDashboard.sln
 
 ### Post-edit Release build
 
-Status: **Pass — exit code 0, 0 warnings, 0 errors; MSBuild elapsed time 2.12 seconds**
+Status: **Pass for the detection correction — exit code 0, 0 warnings, 0 errors; MSBuild elapsed time 1.74 seconds**
 
 Command:
 
@@ -445,7 +486,7 @@ dotnet build DocumentationLoggingDashboard.sln -c Release
 
 ### Windows publish and published launch
 
-Status: **Pass for publish, output inspection, and process startup; partial for hidden GUI navigation**
+Status: **Pass for the detection-correction publish and output inspection**
 
 Repository command:
 
@@ -453,9 +494,9 @@ Repository command:
 powershell -ExecutionPolicy Bypass -File .\publish-windows.ps1
 ```
 
-The first sandboxed attempt demonstrated why the script footer is not sufficient: internal restore failed because the sandbox could not read the user's existing NuGet configuration, while the script still printed `Publish complete` and returned 0. The required rerun outside that restriction showed a successful restore and both application and publish output lines, with no internal error.
+The correction rerun showed a genuine successful internal restore, Release build, and publish output line, with script exit code 0 and no internal error. The clean output contained only `appsettings.json`, `DocumentationLoggingDashboard.exe`, and its PDB. The fresh single-file executable was 118,631,829 bytes, and no loose PDFsharp or MigraDoc DLL was present. This confirms that the unchanged Phase 8 renderer dependency remains packaged by the corrected application.
 
-The clean output contained only `appsettings.json`, `DocumentationLoggingDashboard.exe`, and its PDB. The fresh single-file executable was 118,631,829 bytes; no loose PDFsharp or MigraDoc DLL was present. The executable launched hidden and remained alive past startup. A live Win32 probe found the main form's `Create QA Report` button and posted its click, but the hidden probe did not reliably detect the modal form's new button. A complete published-GUI paired save is therefore not claimed. Before publishing, the pre-existing ignored `PublishedApp/win-x64` tree was moved aside; after inspection its 20-file relative-path/length/SHA-256 manifest was restored exactly, and the fresh generated output was removed.
+Before publishing, the pre-existing ignored `PublishedApp/win-x64` tree was moved aside. After inspection its 20-file relative-path/length/SHA-256 manifest was restored exactly, and the fresh three-file generated output was removed. Published-GUI navigation was not rerun for this detection-only correction; the earlier Phase 9 startup probe remains separate evidence, and a complete published-GUI paired save is still not claimed.
 
 ### V1 and earlier-phase regressions
 
@@ -473,4 +514,4 @@ Not directly driven were visible WinForms layout/accessibility, the actual form 
 
 ## Deferred Phase 10 and later work
 
-Phase 9 does not merge, tag, release, or push a final approval commit. It does not add report history/browsing, opening prior PDFs, index search/filter UI, repair/rebuild tooling, stale-artifact cleanup UI, draft/autosave, background queueing, cross-process/distributed locking, database persistence, cloud upload, email, Teams/Slack notification, spreadsheet export, scheduled automation, or migration of V1 records. Those capabilities require separately approved scope in Phase 10 or later.
+This correction does not merge, tag, release, or begin Phase 10. It does not add report history/browsing, opening prior PDFs, index search/filter UI, repair/rebuild tooling, stale-artifact cleanup UI, draft/autosave, background queueing, cross-process/distributed locking, database persistence, cloud upload, email, Teams/Slack notification, spreadsheet export, scheduled automation, or migration of V1 records. Those capabilities require separately approved scope in Phase 10 or later.

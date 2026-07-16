@@ -32,9 +32,11 @@ public sealed class QaReportSaveService
             ?? throw new ArgumentNullException(nameof(folderNameSanitizer));
         filenameService = new QaReportFilenameService(
             this.folderNameSanitizer);
+        QaReportFilenameParser filenameParser = new(
+            this.folderNameSanitizer);
         existingFileService = new QaReportExistingFileService(
             this.paths,
-            filenameService);
+            filenameParser);
         indexService = new QaReportIndexService(this.paths);
         fileOperations = new QaReportTransactionFileOperations();
     }
@@ -298,11 +300,12 @@ public sealed class QaReportSaveService
             paths.QaReportIndexFilePath,
             "QA report index destination");
 
+        QaReportKey reportKey = new(canonicalHotelId, fileMonth);
         QaReportExistingFiles existingFiles =
             existingFileService.FindExistingFiles(
                 canonicalHotel,
                 canonicalPms,
-                fileMonth);
+                reportKey);
 
         ValidateExistingMatches(
             existingFiles.HotelFilePaths,
@@ -323,7 +326,6 @@ public sealed class QaReportSaveService
             existingFiles.PmsFilePaths,
             "PMS");
 
-        QaReportKey reportKey = new(canonicalHotelId, fileMonth);
         string relativeHotelPath = CreateRelativeQaPath(hotelFinalPath);
         string relativePmsPath = CreateRelativeQaPath(pmsFinalPath);
         QaReportStatus finalStatus = request.ValidationResult.CalculatedStatus!.Value;
@@ -863,7 +865,7 @@ public sealed class QaReportSaveService
             existingFileService.FindExistingFiles(
                 preparation.CanonicalHotel,
                 preparation.CanonicalPms,
-                preparation.FileMonth);
+                preparation.ReportKey);
 
         if (!PathsEqual(
                 preparation.ExistingFiles.HotelFilePaths,

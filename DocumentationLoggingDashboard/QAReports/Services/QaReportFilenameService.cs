@@ -44,10 +44,19 @@ public sealed class QaReportFilenameService
 
         QaReportFilenameComponents components =
             CreateSanitizedComponents(canonicalHotel, canonicalPms);
+        bool usesEncodedFormat =
+            QaReportFilenameParser.RequiresEncodedFormat(components);
+        string componentBody = QaReportFilenameParser.CreateComponentBody(
+            components.SanitizedHotelName,
+            components.SanitizedHotelId,
+            components.SanitizedPmsName,
+            fileMonth,
+            usesEncodedFormat);
+        string dateSeparator = usesEncodedFormat ? "___" : "_";
 
         string filename = string.Create(
             CultureInfo.InvariantCulture,
-            $"{report.QaDate:yyyy-MM-dd}_{components.SanitizedHotelName}_{components.SanitizedHotelId}_{components.SanitizedPmsName}_{fileMonth}_QAReport.pdf");
+            $"{report.QaDate:yyyy-MM-dd}{dateSeparator}{componentBody}_QAReport.pdf");
 
         EnsureStrictLeafFilename(filename);
         return filename;
@@ -70,6 +79,17 @@ public sealed class QaReportFilenameService
         EnsureSafeComponent(sanitizedHotelName, nameof(canonicalHotel));
         EnsureSafeComponent(sanitizedHotelId, nameof(canonicalHotel));
         EnsureSafeComponent(sanitizedPmsName, nameof(canonicalPms));
+
+        string canonicalHotelId = canonicalHotel.HotelId.Trim();
+        if (!string.Equals(
+                sanitizedHotelId,
+                canonicalHotelId,
+                StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "The canonical Hotel ID is not losslessly representable in a QA report filename.",
+                nameof(canonicalHotel));
+        }
 
         return new QaReportFilenameComponents(
             sanitizedHotelName,

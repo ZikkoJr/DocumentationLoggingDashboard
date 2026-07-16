@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using DocumentationLoggingDashboard.QAReports.Models;
 
 namespace DocumentationLoggingDashboard.QAReports.Services;
@@ -9,30 +7,26 @@ namespace DocumentationLoggingDashboard.QAReports.Services;
 /// </summary>
 public sealed class QaReportExistingFileService
 {
-    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
-
     private readonly QaStoragePaths paths;
-    private readonly QaReportFilenameService filenameService;
+    private readonly QaReportFilenameParser filenameParser;
 
     public QaReportExistingFileService(
         QaStoragePaths paths,
-        QaReportFilenameService filenameService)
+        QaReportFilenameParser filenameParser)
     {
         this.paths = paths ?? throw new ArgumentNullException(nameof(paths));
-        this.filenameService = filenameService
-            ?? throw new ArgumentNullException(nameof(filenameService));
+        this.filenameParser = filenameParser
+            ?? throw new ArgumentNullException(nameof(filenameParser));
     }
 
     public QaReportExistingFiles FindExistingFiles(
         QaHotelMetadata canonicalHotel,
         QaPmsMetadata canonicalPms,
-        QaFileMonth fileMonth)
+        QaReportKey reportKey)
     {
         ArgumentNullException.ThrowIfNull(canonicalHotel);
         ArgumentNullException.ThrowIfNull(canonicalPms);
-        QaReportFilenameService.ValidateFileMonth(
-            fileMonth,
-            nameof(fileMonth));
+        ArgumentNullException.ThrowIfNull(reportKey);
 
         if (!string.Equals(
                 canonicalHotel.PmsName?.Trim(),
@@ -44,47 +38,28 @@ public sealed class QaReportExistingFileService
                 nameof(canonicalPms));
         }
 
+        if (!string.Equals(
+                canonicalHotel.HotelId?.Trim(),
+                reportKey.HotelId,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "The canonical Hotel metadata does not agree with the QA report key.",
+                nameof(reportKey));
+        }
+
         string hotelDirectory =
             paths.ResolveHotelDirectory(canonicalHotel.FolderName);
         string pmsDirectory =
             paths.ResolvePmsDirectory(canonicalPms.FolderName);
-        QaReportFilenameComponents components =
-            filenameService.CreateSanitizedComponents(
-                canonicalHotel,
-                canonicalPms);
-        Regex filenamePattern = CreateFilenamePattern(components, fileMonth);
-
         return new QaReportExistingFiles(
-            FindMatches(hotelDirectory, filenamePattern),
-            FindMatches(pmsDirectory, filenamePattern));
+            FindMatches(hotelDirectory, reportKey),
+            FindMatches(pmsDirectory, reportKey));
     }
 
-    private static Regex CreateFilenamePattern(
-        QaReportFilenameComponents components,
-        QaFileMonth fileMonth)
-    {
-        string pattern = string.Concat(
-            "^(?<qaDate>\\d{4}-\\d{2}-\\d{2})_",
-            Regex.Escape(components.SanitizedHotelName),
-            "_",
-            Regex.Escape(components.SanitizedHotelId),
-            "_",
-            Regex.Escape(components.SanitizedPmsName),
-            "_",
-            Regex.Escape(fileMonth.ToString()),
-            "_QAReport\\.pdf$");
-
-        return new Regex(
-            pattern,
-            RegexOptions.CultureInvariant
-                | RegexOptions.IgnoreCase
-                | RegexOptions.ExplicitCapture,
-            RegexTimeout);
-    }
-
-    private static IReadOnlyList<string> FindMatches(
+    private IReadOnlyList<string> FindMatches(
         string directoryPath,
-        Regex filenamePattern)
+        QaReportKey reportKey)
     {
         if (!Directory.Exists(directoryPath))
         {
@@ -111,15 +86,10 @@ public sealed class QaReportExistingFileService
                 continue;
             }
 
-            Match match = filenamePattern.Match(filename);
-
-            if (!match.Success
-                || !DateOnly.TryParseExact(
-                    match.Groups["qaDate"].Value,
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out _))
+            if (!filenameParser.TryParse(
+                    filename,
+                    out QaReportFilenameParts? filenameParts)
+                || filenameParts.ReportKey != reportKey)
             {
                 continue;
             }
