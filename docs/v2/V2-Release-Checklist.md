@@ -4,7 +4,7 @@
 
 Use this checklist to move Version 2 from Phase 10 verification through a controlled pilot and, only after separate approval, toward merge and broad release. It is an operator checklist, not evidence that Version 2 has been released.
 
-Phase 10 work is restricted to branch `v2-qa-reports`. The approved Phase 9 baseline is `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`. Do not merge to `main`, create or move a tag, publish a release, commit, or push merely because a technical gate below passes. Those actions require their own explicit approvals.
+Phase 10 work is restricted to branch `v2-qa-reports`. The approved Phase 9 baseline is `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`. The completed implementation was explicitly committed and pushed only to this branch as `b0879645cde1b6a619accdea70abf7e08425dc22`, then independently inspected. This documentation-only correction is separately authorized. Do not merge to `main`, create or move a tag, publish a release, or push another branch; those actions require their own explicit approvals.
 
 Checkbox convention:
 
@@ -27,6 +27,8 @@ No Phase 10 result in this checklist is classified as `Direct GUI test`. Offscre
 - [x] **Clean starting Git status** — Execution Type: `Source inspection`; Status: `Pass`. `git status --short` returned no paths before Phase 10 edits.
 - [x] **Protected Git state** — Execution Type: `Source inspection`; Status: `Pass`. No merge, rebase, cherry-pick, conflict, tag change, commit, or push was present at the starting gate.
 - [x] **Stable V1 tag retained** — Execution Type: `Source inspection`; Status: `Pass`. The only listed release tag was `v1.0.0`; no V2 tag was created.
+- [x] **Reviewed Phase 10 implementation commit** — Execution Type: `Source inspection`; Status: `Pass`. Commit `b0879645cde1b6a619accdea70abf7e08425dc22` is a nine-file, non-merge child of `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`, was pushed only to `v2-qa-reports`, and contains no package change or generated artifact.
+- [x] **Independent implementation result** — Execution Type: `Source inspection`; Status: `Pass`. The recorded outcome is `Phase 10 approved with minor documentation corrections`. This result applies to the reviewed implementation commit and does not pre-approve the documentation-correction commit.
 
 Re-run the repository gate before any later commit, merge, or release action:
 
@@ -39,9 +41,10 @@ git tag --list
 git merge-base --is-ancestor 5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1 HEAD
 git merge-base --is-ancestor 49beaa1f45700725d328ade215419254560cb406 HEAD
 git merge-base --is-ancestor 7d94a27a4569f8ca521aeaa6c08da0e510fc4dc7 HEAD
+git merge-base --is-ancestor b0879645cde1b6a619accdea70abf7e08425dc22 HEAD
 ```
 
-All three ancestry commands must exit `0`. Stop if the branch is wrong, an approved commit is absent, a Git operation is in progress, or unexplained files appear.
+All four ancestry commands must exit `0`. Stop if the branch is wrong, an approved commit is absent, a Git operation is in progress, or unexplained files appear.
 
 ### Regression and hardening evidence
 
@@ -107,11 +110,11 @@ The existing ignored `PublishedApp` tree contains pre-existing/user-looking V1 d
 Complete every item in this section before authorizing the controlled pilot.
 
 - [x] **Final build/publish evidence is complete** — Execution Type: `Service or harness test`; Status: `Pass`. Debug, Release, publish, and the published-process startup probe all passed with the exact evidence recorded above.
-- [x] **Final repository hygiene** — Execution Type: `Source inspection`; Status: `Pass`. Final status, ignored status, diff-stat, whitespace, full-diff, and scoped-diff checks found only the four justified source fixes and five required untracked documents; intended uncommitted changes are awaiting review.
+- [x] **Final repository hygiene** — Execution Type: `Source inspection`; Status: `Pass`. The nine reviewed Phase 10 files were committed as `b0879645cde1b6a619accdea70abf7e08425dc22`, pushed only to `v2-qa-reports`, and independently inspected; no unexplained or generated artifact was included.
 - [x] **Temporary verification cleanup** — Execution Type: `Source inspection`; Status: `Pass`. `.phase10-verification`, temporary PDF/render trees, synthetic scenario roots, publish-test output, transaction artifacts, and recovery-test data are absent; the protected pre-existing ignored publish tree was restored.
 - [x] **Generated artifact review** — Execution Type: `Source inspection`; Status: `Pass`. No PDF, PNG, test metadata, QA index, user settings, QA runtime tree, publish output, harness source, test result, or coverage artifact is tracked.
-- [x] **Final source-diff scope** — Execution Type: `Source inspection`; Status: `Pass`. The worktree has exactly four modified files mapped to `P10-DEF-001` through `P10-DEF-004` and the five required documents. Project/package, `.gitignore`, MainForm, and V1 scoped diffs are empty.
-- [x] **Required documentation review** — Execution Type: `Source inspection`; Status: `Pass`. The five final documents agree on the baseline, 368/0 harness result, four fixed defects, completed build/publish gates, pending visible-GUI/pilot work, and release boundary.
+- [x] **Final source-diff scope** — Execution Type: `Source inspection`; Status: `Pass`. Reviewed commit `b0879645cde1b6a619accdea70abf7e08425dc22` contains exactly four justified source fixes and five required Phase 10 documents. Project/package, `.gitignore`, MainForm, and V1 files are unchanged.
+- [x] **Required documentation review** — Execution Type: `Source inspection`; Status: `Pass`. Independent inspection found the technical results consistent and required only minor Git-state documentation corrections. The documentation-correction commit remains subject to subsequent independent inspection.
 - [ ] **V1 visible desktop smoke plan accepted** — Execution Type: `Manual test pending`; Status: `Not Run`. Pilot owner acknowledges that visible startup/close/reopen, required-field prompts, Preview/Submit, Change/Reset Folder, and Open File/Folder/Index were not directly clicked during Phase 10.
 - [ ] **V2 visible desktop smoke plan accepted** — Execution Type: `Manual test pending`; Status: `Not Run`. Pilot owner acknowledges that visible report entry, prompt text/defaults, cancellation, double-click protection, and end-to-end GUI saving remain pilot checks.
 - [ ] **UI/scaling risk accepted for controlled pilot** — Execution Type: `Manual test pending`; Status: `Not Run`. Offscreen default/minimum-size control checks passed, but visible 100%, 125%, and 150% scaling, clipping/overlap, scroll behavior, focus cues, keyboard navigation, and screen-reader behavior remain unverified.
@@ -121,7 +124,7 @@ Complete every item in this section before authorizing the controlled pilot.
 - [ ] **Stop/rollback contacts assigned** — Execution Type: `Manual test pending`; Status: `Not Run`. Record the pilot owner, defect contact, backup owner, and person authorized to reconcile a manual-review transaction state.
 - [ ] **Known limitations accepted** — Execution Type: `Manual test pending`; Status: `Not Run`. Pilot owner reviews the limitation list below and accepts only controlled, monitored use.
 
-Current technical recommendation: **Ready for controlled pilot**. The completed engineering, cleanup, and documentation gates support a supervised pilot; the unchecked operational items above must be completed by the pilot owner before pilot execution. This is not Phase 10 approval and does not authorize merge or release.
+Current technical recommendation: **Ready for controlled pilot**. The completed engineering and cleanup gates support a supervised pilot; the unchecked operational items above must be completed by the pilot owner before pilot execution. Independent review result: **Phase 10 approved with minor documentation corrections**. Final unconditional Phase 10 approval remains pending independent inspection of the pushed documentation-correction commit; this does not authorize merge or release.
 
 ## Controlled pilot execution
 
@@ -212,8 +215,8 @@ All items below remain unchecked until they are actually and separately complete
 - [ ] **UI/scaling review complete** — Execution Type: `Manual test pending`; Status: `Not Run`. Require acceptable visible behavior at 100%, 125%, and 150%, or document and approve a tested organizational scaling boundary.
 - [ ] **Pilot completed successfully** — Execution Type: `Manual test pending`; Status: `Not Run`. Require reviewed pilot evidence or a separately documented explicit waiver.
 - [ ] **Known issues dispositioned** — Execution Type: `Manual test pending`; Status: `Not Run`. No open privacy, data-loss, rollback, path-traversal, false-success, or blocking V1/V2 issue may remain.
-- [ ] **Final repository status clean after approved commit** — Execution Type: `Source inspection`; Status: `Not Run`. Require no unexplained/untracked/generated files and a known final commit on `v2-qa-reports`.
-- [ ] **Final Phase 10 independent approval** — Execution Type: `Manual test pending`; Status: `Not Run`. A separate reviewer must inspect the actual pushed commit; this document does not grant approval.
+- [ ] **Final documentation-correction commit and clean branch state** — Execution Type: `Source inspection`; Status: `Not Run`. Require the documentation-only correction commit to be pushed to `v2-qa-reports`, with no unexplained/untracked/generated files, then record its full hash.
+- [ ] **Final unconditional Phase 10 approval** — Execution Type: `Manual test pending`; Status: `Not Run`. A separate reviewer must inspect the pushed documentation-only correction commit. The correction commit must not approve itself.
 - [ ] **Explicit merge approval** — Execution Type: `Manual test pending`; Status: `Not Run`. Obtain a separate instruction authorizing merge to `main`.
 - [ ] **Main-branch merge** — Execution Type: `Manual test pending`; Status: `Not Run`. Do not merge during the Phase 10 working run.
 - [ ] **Post-merge Debug and Release builds** — Execution Type: `Service or harness test`; Status: `Not Run`. Run both exact build commands against the approved merged commit and record results.
@@ -224,7 +227,7 @@ All items below remain unchecked until they are actually and separately complete
 - [ ] **Release artifact published** — Execution Type: `Manual test pending`; Status: `Not Run`. Do not distribute or announce Version 2 before release approval.
 - [ ] **Branch-retention decision** — Execution Type: `Manual test pending`; Status: `Not Run`. Decide whether and how to retain `v2-qa-reports`; do not delete it as part of Phase 10.
 
-Current broad-release recommendation: **Not ready for merge and release**. Required visible GUI/scaling work, controlled-pilot completion, independent Phase 10 approval, explicit merge approval, post-merge verification, release approval, and tag/release actions are all still pending.
+Current broad-release recommendation: **Not ready for merge and release**. Required visible GUI/scaling work, controlled-pilot completion, independent inspection of the documentation-correction commit and final unconditional Phase 10 approval, explicit merge approval, post-merge verification, release approval, tag creation, and publication are all still pending.
 
 ## Final operator sign-off
 
@@ -235,9 +238,12 @@ Current broad-release recommendation: **Not ready for merge and release**. Requi
 - Unresolved pilot risks accepted:
 - Pilot completion decision and date:
 - Independent Phase 10 reviewer:
+- Reviewed Phase 10 implementation commit: `b0879645cde1b6a619accdea70abf7e08425dc22`
+- Independent implementation result: `Phase 10 approved with minor documentation corrections`
+- Documentation-correction commit: Pending creation, push to `v2-qa-reports`, and independent inspection
 - Explicit merge approval reference:
 - Release approval reference:
-- Final approved commit:
+- Final approved commit: Pending the documentation-correction commit and its independent inspection
 - Release tag, if separately authorized:
 - Branch-retention decision:
 

@@ -4,7 +4,7 @@
 
 Phase 10 performed final regression, hardening, pilot-readiness, and release-preparation work for the Version 2 QA Report workflow while preserving Version 1. Work stayed on `v2-qa-reports` and started from the approved Phase 9 baseline `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`.
 
-This report records technical evidence, not independent Phase 10 approval. No commit, push, merge, tag, distribution, or release was authorized or performed. The current technical recommendation is **Ready for controlled pilot**. The current broad-release recommendation is **Not ready for merge and release** because direct visible-GUI/scaling checks, the controlled pilot, independent review of a later pushed commit, and separate merge/release approvals remain outstanding.
+During the original Codex validation run, this report recorded technical evidence before independent Phase 10 approval; no commit or push occurred during that run. The completed Phase 10 implementation was subsequently committed as `b0879645cde1b6a619accdea70abf7e08425dc22`, pushed only to `v2-qa-reports`, and independently inspected. The independent result was **Phase 10 approved with minor documentation corrections**. No merge, tag, distribution, or release occurred. The current technical recommendation is **Ready for controlled pilot**. The broad recommendation remains **Not ready for merge and release** because direct visible-GUI/scaling checks, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation remain outstanding.
 
 ## Audit identity and environment
 
@@ -14,7 +14,9 @@ This report records technical evidence, not independent Phase 10 approval. No co
 | Branch | `v2-qa-reports` |
 | Approved Phase 9 baseline | `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1` |
 | Starting commit | `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1` |
-| Ending commit | Unchanged at `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`; Phase 10 changes are intentionally uncommitted |
+| Original validation ending checkpoint | `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`; no commit or push occurred during the original Codex validation run |
+| Reviewed Phase 10 implementation commit | `b0879645cde1b6a619accdea70abf7e08425dc22`; direct parent `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`; later committed and pushed only to `v2-qa-reports`, then independently inspected |
+| Independent verification result | `Phase 10 approved with minor documentation corrections` |
 | Earlier approved ancestry | Phase 1 `49beaa1f45700725d328ade215419254560cb406` and Phase 2 `7d94a27a4569f8ca521aeaa6c08da0e510fc4dc7` both returned ancestry exit code `0` |
 | Existing tags | `v1.0.0` only |
 | Operating system | Windows `10.0.26200`, x64, RID `win-x64` |
@@ -51,7 +53,9 @@ The three files totaled 118,749,230 bytes. No QA data, V1 data, source, verifica
 
 The ignored pre-existing `PublishedApp` tree contained 20 user-owned files. It was preserved without reading or reporting its data values, the fresh output was tested separately, and the original tree was restored. Relative path, length, and SHA-256 manifests matched before and after restoration. No fresh local publish artifact was retained or tracked, and Version 2 was not distributed or released.
 
-## Files changed
+## Files in reviewed Phase 10 implementation commit
+
+Commit `b0879645cde1b6a619accdea70abf7e08425dc22` contains exactly the nine files listed below.
 
 ### Created
 
@@ -85,7 +89,7 @@ Four defects were discovered and all four were fixed and retested. No confirmed 
 
 ### V2 end-to-end result
 
-**Execution Type: Service or harness test; Status: Pass.** The final disposable production-service/offscreen-form harness completed 368 assertions with 0 failures after the four fixes. Coverage spanned catalogs, clean initialization, metadata and recovery, moderate volume/search, report rules, findings, statistics, validation/status, in-memory PDF generation, paired saving, overwrite/reconciliation, rollback/fault behavior, QA indexing, path safety, V1 isolation, and form construction. The detailed 338-row matrix retains the four historical reproduction rows as `Fail` and pairs each with a current retest row marked `Pass`.
+**Execution Type: Service or harness test; Status: Pass.** The final disposable production-service/offscreen-form harness completed 368 assertions with 0 failures after the four fixes. Coverage spanned catalogs, clean initialization, metadata and recovery, moderate volume/search, report rules, findings, statistics, validation/status, in-memory PDF generation, paired saving, overwrite/reconciliation, rollback/fault behavior, QA indexing, path safety, V1 isolation, and form construction. The detailed 339-row matrix retains the four historical reproduction rows as `Fail`, pairs each with a current retest row marked `Pass`, and adds one post-commit source-inspection row without changing any technical result.
 
 ### V1 regression
 
@@ -183,12 +187,12 @@ The disposable harness assertion groups were: catalog/path/filename 32; clean in
 
 Pilot risks are therefore concentrated in visible usability/scaling, real-workstation permissions/fonts, operator handling of overwrite and recovery prompts, concurrent-process avoidance, and adherence to the privacy rules. These are bounded by the pilot guide's backup, single-process, stop, evidence, and synthetic-data guardrails.
 
-Release risks remain higher: the direct GUI/scaling matrix, controlled pilot, independent Phase 10 review, an approved committed and pushed candidate, explicit merge authorization, post-merge verification, release approval, and tag/release actions have not occurred.
+Release risks remain higher: the direct GUI/scaling matrix, controlled pilot, explicit merge authorization, post-merge verification, release approval, tag creation, and release actions have not occurred. The implementation commit has been independently inspected; the documentation-only correction commit remains subject to subsequent inspection and is not pre-approved.
 
 ## Final recommendation and protected-state confirmation
 
 **Controlled pilot recommendation: Ready for controlled pilot.** Debug, Release, local publish, V1/V2 service regression, metadata, report rules, findings, statistics, PDF rendering, paired saving, overwrite, rollback, index, path, and privacy gates passed with no open confirmed defect. The complete pilot guide explicitly carries the outstanding visible-GUI, scaling, prompt, ACL, published-workflow, and operator checks.
 
-**Merge-and-release recommendation: Not ready for merge and release.** Direct visible-GUI/scaling work, the controlled pilot, independent review of a later pushed commit, a clean committed candidate, explicit merge approval, post-merge verification, release approval, and release tagging remain incomplete.
+**Merge-and-release recommendation: Not ready for merge and release.** Direct visible-GUI/scaling checks, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation remain incomplete.
 
-No new feature was added. No new package was added. Protected V1 output behavior was not changed. No merge occurred. No tag was created or moved. Version 2 has not been released. Nothing was committed or pushed.
+No new feature was added. No new package was added. Protected V1 output behavior was not changed. No merge occurred. No tag was created or moved. Version 2 has not been released. No commit or push occurred during the original Codex validation run; the completed Phase 10 work was later committed as `b0879645cde1b6a619accdea70abf7e08425dc22` and pushed only to `v2-qa-reports`.
