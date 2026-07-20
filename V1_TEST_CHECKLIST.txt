@@ -110,6 +110,9 @@ LogIndex.txt
 [ ] Confirm the Script Creation Log line uses Script: {Script Name}.
 [ ] Confirm the Script Creation Log line uses Hotels That Use This Script: {Hotels that use this script}.
 [ ] Confirm each index line includes the saved daily log file path.
+[ ] Confirm no V1 entry is added to QAReports/Index/QAReportIndex.txt.
+[ ] Confirm a Debugging Log remains only under DebuggingLogs and is not routed
+    into Hotel/PMS folders. This is expected until the deferred V2.1 enhancement.
 
 Open buttons
 ------------

@@ -1,6 +1,12 @@
 # Version 2 QA Reports - Release Notes Draft
 
+> **Production-candidate update (2026-07-20):** Final cleanup and synthetic regression now cover Blank/Broken semantics, denominator propagation, deferred text, layout at actual 125% scaling, blocked saves, overwrite replacement, byte-identical paired PDFs, QA index status, and protected V1 output. Real 100% and 150% DPI were unavailable and are not claimed. The separate immutable candidate is for independent review; `main` is not merged and no V2 tag or release exists. Debugging Log Hotel/PMS routing is deferred to V2.1.
+
 > **Draft only:** Version 2 has not been merged, tagged, published, or released. These notes describe the current `v2-qa-reports` candidate and must be updated from the final approved commit before release.
+
+> **Controlled-pilot boundary:** Final semantic, deferred-text, geometry, save/PDF/index, blocked-save, overwrite, actual-125% visible, and protected V1 regressions pass. Real 100%/150% DPI remains open. Do not use this draft to resume Scenario 3, replace the frozen package, modify the live Retry-01 root, merge, tag, or release.
+
+> **Deferred-text correction:** V2 defers QA report free-text model commits until validation/action boundaries and batches the resulting refresh. Focused 8/8, synthetic PDF/index, actual-125% long-note, and protected V1 evidence pass. Real 100%/150% DPI and independent production-candidate review remain open. See `Pilot-Correction-Deferred-Text-Commit.md`.
 
 ## Overview
 
@@ -24,7 +30,12 @@ Metadata editing and deletion are not included in this version.
 - Complete the approved 28-item Raw File QA and DB QA catalog.
 - Apply checklist items dynamically for separate-name columns, a full-name column, currency, one or two monetary columns, rejected records, and always-applicable checks.
 - Record manual statistics, including separate Blank Value Statistics and Broken Data Statistics.
-- Use safe percentage and denominator calculations, including zero-denominator cases.
+- Treat Total Data Rows as the operator-entered count of data-bearing rows, excluding headers/preamble; Headers Present and Data Start Row do not cause another subtraction. For 120 occupied physical rows with a row-1 header and data starting on row 2, enter `119`.
+- Default each newly applicable Blank denominator automatically from Total Data Rows while permitting a per-row manual override and visible Auto reset.
+- Default each newly applicable Broken denominator automatically from the matching Blank denominator minus Blank Count while permitting a separate per-row manual override and Auto reset.
+- Keep Blank (missing cell) separate from Broken (invalid populated value). A positive exact percentage through and including 50% is a Warning; above 50% is a Failure; zero numerator or denominator produces no threshold finding.
+- Use safe percentage and denominator validation without clamping entered counts, including zero-denominator and impossible Auto/manual states.
+- Keep finding/checklist/report/statistics free text responsive as a local draft while typing; commit on focus validation or readiness/save/workflow boundaries, with one batched refresh where multiple drafts are flushed.
 
 The application does not read a spreadsheet, parse a hotel file, query a database, or populate checklist results automatically.
 
@@ -33,8 +44,9 @@ The application does not read a spreadsheet, parse a hotel file, query a databas
 - Show Warnings and Failed Checks in separate areas.
 - Create deterministic findings from failed checks, passed-check notes, and approved characteristic/statistics rules.
 - Resolve each finding independently as Explained and Accepted or, where applicable, Handled by Custom Script.
-- Preserve the finding's original severity. Handling a Failure does not downgrade it or change a Fail report to a warning status.
+- Preserve the finding's original severity. A handled Failure remains under Failed Checks; when no Active Failure remains, the existing status service calculates Pass with Warnings.
 - Remove stale findings and reset a resolution if its underlying condition disappears and later returns.
+- Use separate deterministic Warning and Failure families for Blank and Broken thresholds. For a mapped Broken result above 50%, blank Notes on the current failing checklist row identify a threshold-only condition and suppress its generic generated checklist Failure. Nonblank checklist Notes document a separate contextual defect, so both the canonical statistics Failure and contextual checklist Failure remain; resolution state alone does not control this decision.
 
 ### Validation and status
 
@@ -73,9 +85,17 @@ Final regression identified and corrected four narrowly scoped defects:
 
 Post-fix service/harness validation completed 368 assertions with 0 failures. Structural, extraction, and visual checks covered a 2-page Pass PDF, 4-page Pass with Warnings PDF, 3-page Fail PDF, 3-page custom-script-handled PDF, and 24-page long-content PDF. All 900 indexed long-content tokens were present; the lowest checklist content ended at 716.29 points while the footer began around 770.84 points, and no private local path appeared.
 
-Offscreen WinForms construction passed, but that evidence is not a direct visible-GUI test. Visible operation, 125%/150% scaling, prompts and dialogs, keyboard navigation, and a completed controlled pilot remain pending and block a broad release claim.
+Those are historical Phase 10 results. Assertions and artifacts whose expected outcome depended on the prior Blank/Broken thresholds, denominator behavior, finding IDs, checklist Notes context, readiness/status, or affected PDF/index content were superseded as evidence for the P1 correction; replacement evidence is recorded below. Unaffected pagination, transaction, path, metadata, privacy, and V1 evidence may remain useful after explicit regression review.
 
-The final production rebuild without the temporary friend harness and the exact Debug and Release builds passed with 0 warnings and 0 errors. The publish wrapper succeeded and produced only `DocumentationLoggingDashboard.exe`, `DocumentationLoggingDashboard.pdb`, and `appsettings.json`; the published executable also remained running through its hidden smoke interval. The pre-existing ignored publish directory was restored byte-for-byte after verification.
+Actual-Windows-125% visible no-save evidence now covers initial, maximized, 880x600, maximum-applicability, header-row, manual/Auto, and font-pressure states; permanent STA suites cover containment, mouse hit-testing, forward/reverse keyboard navigation, and scrolling. Real Windows 100% and 150% remain Not Run and continue to block a complete scaling claim.
+
+For the correction, final Debug and Release solution and permanent-test builds passed with 0 warnings/errors. The isolated output's EXE, PDB, `appsettings.json`, and isolated `user-settings.json` were hashed; the visible application responded and closed normally with exit 0 without saving. A final audit found the frozen package, live Retry-01 root, V1 data, Git history, `main`, tag inventory, dependencies, and deployment model unchanged. The verification output is not an approved pilot package.
+
+## Controlled-pilot P1 correction reviewed locally
+
+The correction propagates the operator-entered data-only Total Data Rows through automatic Blank denominators and derives automatic Broken nonblank denominators from the matching Blank values, while preserving valid manual overrides. Header/data-start metadata do not cause an additional subtraction. It keeps the existing status calculator, save transaction, PDF structure, QA index format, storage paths, dependency set, and V1 contracts.
+
+Current evidence includes semantic 7/7, deferred-text 8/8, STA geometry 7/7, actual-125% visible no-save, blocked-save, overwrite, paired PDF/index, protected V1, and rendered PDF review. The P2 Notes discriminator, direct PDF-order assertion, and real 100%/150% DPI remain open. The permanent test project is included in the solution.
 
 ## Privacy and local storage
 
@@ -91,9 +111,9 @@ Enter only Hotel/PMS identifiers, aggregate statistics, and non-sensitive QA sum
 - No automatic repair of malformed QA metadata or `QAReportIndex.txt`.
 - An abnormal process or machine termination may leave a backup that requires manual review; every abandoned backup is not automatically cleaned.
 - Real Windows permission/ACL behavior has not received complete environment-level coverage; artificial fault injection covered the transaction branches.
-- Visible GUI, Windows 125%/150% scaling, keyboard navigation, message boxes, overwrite-dialog behavior, and double-click behavior still require direct pilot verification.
+- Actual-125% visible no-save and STA mouse/keyboard behavior passed. Real 100%/150%, message boxes, overwrite-dialog behavior, and double-click behavior still require direct verification.
 - The published application is Windows x64, self-contained, and single-file, and PDF rendering relies on the Windows GDI build and an available Arial typeface.
-- Phase 10 used a disposable friend harness, not a permanent automated test project.
+- Phase 10 used a disposable friend harness. The correction adds permanent focused semantic, STA geometry/interaction, and synthetic save/PDF/index coverage that passed in Debug and Release; the project is not included in the solution and must be run explicitly.
 - Existing unrelated V1 technical debt is not redesigned by Version 2.
 
 ## Future direction
@@ -102,4 +122,4 @@ Future phases may consider separately approved automation for safe file parsing,
 
 ## Release-readiness note
 
-The current package is technically build/publish ready for a controlled pilot with the guardrails in `V2-Pilot-Guide.md`. It does not support stating that Version 2 is released. Merge, tag, and release remain subject to completed direct GUI checks, a successful controlled pilot unless explicitly waived, review of known issues, a clean final branch, and separate explicit approval.
+The frozen package and current local correction are **not ready to resume the controlled pilot**. Replacement of the package and Scenario 3 resumption remain separately blocked after correction implementation, fresh evidence, independent review, and commit authorization. Merge, tag, and release additionally require a successful authorized pilot unless explicitly waived, a clean final approved branch, post-merge verification, and separate explicit approvals.

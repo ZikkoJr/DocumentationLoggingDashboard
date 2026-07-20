@@ -1,10 +1,16 @@
 # Phase 10 Final Validation and Release Readiness
 
+> **Final V2 production-candidate cleanup (2026-07-20):** The approved Phase 1-10 baseline plus the Blank/Broken, layout, and deferred-text pilot corrections completed final source inspection, synthetic regression, V1 isolation, overwrite, paired PDF/index, and actual-125% visible layout verification. The permanent regression project is now in the solution, and test-only diagnostic counters were removed from the production form. Real 100% and 150% DPI remain untested and are not claimed. The authoritative current record is `V2-Production-Readiness.md`. `main` remains unmerged, no `v2.0.0` tag or release exists, and Debugging Log Hotel/PMS routing remains deferred to V2.1.
+
 ## Purpose and decision boundary
 
 Phase 10 performed final regression, hardening, pilot-readiness, and release-preparation work for the Version 2 QA Report workflow while preserving Version 1. Work stayed on `v2-qa-reports` and started from the approved Phase 9 baseline `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`.
 
-During the original Codex validation run, this report recorded technical evidence before independent Phase 10 approval; no commit or push occurred during that run. The completed Phase 10 implementation was subsequently committed as `b0879645cde1b6a619accdea70abf7e08425dc22`, pushed only to `v2-qa-reports`, and independently inspected. The independent result was **Phase 10 approved with minor documentation corrections**. No merge, tag, distribution, or release occurred. The current technical recommendation is **Ready for controlled pilot**. The broad recommendation remains **Not ready for merge and release** because direct visible-GUI/scaling checks, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation remain outstanding.
+During the original Codex validation run, this report recorded technical evidence before independent Phase 10 approval; no commit or push occurred during that run. The completed Phase 10 implementation was subsequently committed as `b0879645cde1b6a619accdea70abf7e08425dc22`, pushed only to `v2-qa-reports`, and independently inspected. The independent result was **Phase 10 approved with minor documentation corrections**. No merge, tag, distribution, or release occurred. At that historical checkpoint, the technical recommendation was **Ready for controlled pilot** while the broad recommendation remained **Not ready for merge and release** because direct visible-GUI/scaling checks, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation were outstanding.
+
+> **Current controlled-pilot correction status:** This historical hold is superseded by the final production-candidate cleanup record. Blank/Broken semantic, save/PDF/index, blocked-save, overwrite, actual-125% geometry/visible, and separate synthetic V1 regressions pass. The frozen pilot package and pilot roots remain protected and unchanged. The new immutable package proceeds to independent review only; real Windows 100%/150% DPI, merge, tag, and release remain open.
+
+> **Later deferred-text correction:** Pilot note entry exposed a separate P2 per-character refresh defect. The final deferred-commit/batched-refresh correction has focused 8/8 coverage, five paired-save/PDF/index cases, actual-125% long-note readiness evidence, and protected V1 regression. Real 100%/150% scaling and a direct visible Save-dialog sequence remain open. `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md` are authoritative.
 
 ## Audit identity and environment
 
@@ -17,6 +23,7 @@ During the original Codex validation run, this report recorded technical evidenc
 | Original validation ending checkpoint | `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`; no commit or push occurred during the original Codex validation run |
 | Reviewed Phase 10 implementation commit | `b0879645cde1b6a619accdea70abf7e08425dc22`; direct parent `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`; later committed and pushed only to `v2-qa-reports`, then independently inspected |
 | Independent verification result | `Phase 10 approved with minor documentation corrections` |
+| Historical documentation follow-up / later pilot baseline | `d8f2eeeab6d7dea83c9c2924ccb2987645fc69cc`; not approval of the current P1 correction |
 | Earlier approved ancestry | Phase 1 `49beaa1f45700725d328ade215419254560cb406` and Phase 2 `7d94a27a4569f8ca521aeaa6c08da0e510fc4dc7` both returned ancestry exit code `0` |
 | Existing tags | `v1.0.0` only |
 | Operating system | Windows `10.0.26200`, x64, RID `win-x64` |
@@ -83,13 +90,13 @@ The project file, `.gitignore`, `MainForm.cs`, and `MainForm.Designer.cs` have n
 | `P10-DEF-003` | A fault after Hotel-then-PMS backup moves restored grouped backups instead of the true global reverse move order | Concatenate Hotel then PMS backup records before filtering moved records and reversing | Injected transaction failure restored in exact reverse sequence; the complete pre-save snapshot was byte-identical and no transaction artifacts remained | Fixed; Pass |
 | `P10-DEF-004` | A 900-segment checklist detail remained one indivisible MigraDoc row, overflowed the printable area, and entered the footer region in the baseline 16-page render | Reuse the bounded narrative splitter and emit checklist continuation rows with repeated status | Final long report was 24 pages; all 900 unique `CHECKSEG` tokens appeared exactly once, all footers and later sections remained, and no clipping/overlap was observed | Fixed; Pass |
 
-Four defects were discovered and all four were fixed and retested. No confirmed Phase 10 defect is deferred. Pending manual coverage and documented product limitations are not represented as fixed defects.
+Four defects were discovered during the historical Phase 10 run and all four were fixed and retested. At that checkpoint, no confirmed Phase 10 defect was deferred. The later controlled-pilot P1 Blank/Broken Statistics defect is tracked separately; this historical statement is not a claim that the current correction is complete or approved.
 
 ## Verification outcome by area
 
 ### V2 end-to-end result
 
-**Execution Type: Service or harness test; Status: Pass.** The final disposable production-service/offscreen-form harness completed 368 assertions with 0 failures after the four fixes. Coverage spanned catalogs, clean initialization, metadata and recovery, moderate volume/search, report rules, findings, statistics, validation/status, in-memory PDF generation, paired saving, overwrite/reconciliation, rollback/fault behavior, QA indexing, path safety, V1 isolation, and form construction. The detailed 339-row matrix retains the four historical reproduction rows as `Fail`, pairs each with a current retest row marked `Pass`, and adds one post-commit source-inspection row without changing any technical result.
+**Execution Type: Service or harness test; Historical Status: Pass.** The final disposable production-service/offscreen-form harness completed 368 assertions with 0 failures after the four Phase 10 fixes. Coverage spanned catalogs, clean initialization, metadata and recovery, moderate volume/search, report rules, findings, statistics, validation/status, in-memory PDF generation, paired saving, overwrite/reconciliation, rollback/fault behavior, QA indexing, path safety, V1 isolation, and form construction. The historical 339-row portion of the matrix retains the four reproduction rows as `Fail`, pairs each with its then-current retest row marked `Pass`, and adds one post-commit source-inspection row without changing that historical result; focused P1 rows were added later. Assertions whose expected result depended on the old Blank/Broken thresholds, denominator behavior, managed finding families, blank-versus-nonblank checklist Notes behavior, resolution state, or affected status/PDF/index output remain **superseded as correction evidence**; the current focused P1 rows record the completed reruns and the remaining open gates.
 
 ### V1 regression
 
@@ -113,21 +120,21 @@ Corrupt, empty, unsupported-schema, relationship-invalid, missing, and inaccessi
 
 ### Findings and custom-script behavior
 
-**Execution Type: Service or harness test; Status: Pass.** Deterministic findings were exercised for failed checks, passed-check notes, characteristic rules, and statistics rules. Warnings and Failures remained separate. Per-finding Explained and Accepted and eligible Handled by Custom Script resolutions worked independently. Original severity and report Fail status were preserved for handled Failures. Stale findings were removed and a reappearing condition reset its prior resolution.
+**Execution Type: Service or harness test; Historical Status: Pass; Correction Status: Pass.** Final focused semantic automation passed 7/7 in Debug and Release. It exercised four-family Blank/Broken creation, threshold transitions, disappearance/reappearance, mapped Broken deduplication, blank-Notes threshold-only suppression, nonblank-Notes contextual preservation, and resolution-state independence. The model has no explicit cause marker; Notes remain the only causal discriminator, which is a documented P2 residual risk.
 
 ### Statistics, validation, and status
 
-**Execution Type: Service or harness test; Status: Pass.** Blank Value Statistics and Broken Data Statistics remained distinct. Name, File Month, monetary, database, threshold-boundary, zero-row, zero-denominator, percentage, and stale-readiness cases passed. Validation blocked incomplete or stale reports, blank Created By remained nonblocking, and the effective fallback was `InnoVarxi QA Team`. Pass, Pass with Warnings, Fail, and custom-script-handled Failure outcomes matched the approved rules.
+**Execution Type: Service or harness test; Historical Status: Pass; Correction Status: Pass.** Blank Value Statistics and Broken Data Statistics remain distinct: Blank measures missing values against operator-entered Total Data Rows, which is the data-only count excluding headers/preamble, while Broken measures invalid populated values against the applicable nonblank population. Headers/data-start metadata do not trigger another subtraction. Final Debug and Release semantic suites passed 7/7, including the 119-row header-exclusion regression and First/Full/Last Name cases. Permanent geometry/propagation automation also passed 7/7 in Debug and Release at actual 125% scaling.
 
 ### PDF generation and visual verification
 
-**Execution Type: Service or harness test; Status: Pass.** Five post-fix PDFs were generated in memory and then removed: Pass (2 pages), Pass with Warnings (4), Fail (3), custom-script-handled Failure (3), and long-content (24). Structural extraction verified required sections, correct status/content, distinct statistics tables, privacy text, every footer, page totals, and safe basename `synthetic-example.csv`; the synthetic private-path marker was absent.
+**Execution Type: Service or harness test plus rendered review; Historical Status: Pass; Correction Status: Pass with bounded residual coverage.** The correction does not add a PDF section or change the file format. The preserved seven-case synthetic matrix produced expected Pass/Pass with Warnings/Fail outcomes, byte-identical destination pairs, and seven index entries. Representative both-Warnings, mapped-Failure, and handled-mapped-Failure PDFs were rendered and visually inspected with separate tables, expected placement/status, no clipping/overlap, and no guest-level data. A direct permanent PDF-order assertion and rendered nonblank-Notes two-Failure variant remain coverage gaps.
 
 All pages were rendered at 144 DPI with an explicit white background. Contact sheets and representative individual pages were visually inspected. The 24-page stress report retained all 900 checklist markers and 18 manual finding titles; its lowest checklist word ended at 716.29 points while the footer began at 770.84 points. No observed tested page had clipping, overlap, missing content, a blank trailing page, or footer collision. This render-and-inspect evidence applies to the tested synthetic content and installed font environment; it is not proof for every printer, font configuration, target workstation, or unbounded input.
 
 ### Generate once, paired saving, and overwrite
 
-**Execution Type: Service or harness test; Status: Pass.** Source and harness evidence confirmed one renderer invocation per save workflow, with the same in-memory PDF bytes reused for Hotel and PMS destinations. Fresh saves produced byte-identical copies, one current index entry, and no normal-success transaction files.
+**Execution Type: Service or harness test; Historical Status: Pass; Correction Status: Pass for seven isolated synthetic outcomes.** Source and harness evidence confirmed one renderer invocation per save workflow, with the same in-memory PDF bytes reused for Hotel and PMS destinations. The corrected seven-case run produced byte-identical copies, one logical index entry per case with expected status, and no transaction leftovers. This does not replace V1 regression, published startup, real-scaling, or pilot evidence.
 
 The logical key remained Hotel ID plus File Month, so a different QA Date targeted the same report. Cancellation was represented by not invoking save after the production service identified existing matches; explicit save-service guarding also refused unconfirmed overwrite, leaving both copies and the complete index unchanged. Confirmed overwrite safely reconciled the pair and index. Hotel-only, PMS-only, multiple-stale-file, missing-index-entry, files-missing-for-index-entry, similar-ID, and relative-path cases were exercised.
 
@@ -155,18 +162,25 @@ Lexical containment does not detect every reparse-point or junction redirection 
 
 **Execution Type: Service or harness test; Status: Pass.** Forty-three offscreen WinForms assertions covered MainForm and the PMS, Hotel, and QA Report forms; control creation, handles, tabs, buttons, scrolling containers, minimum sizing, accessibility text, privacy text, and reentrancy controls were present.
 
-**Execution Type: Direct GUI test; Status: Not Run.** No human-visible session was controlled. Normal visible use, 100%/125%/150% scaling, clipping and overlap, keyboard navigation, focus order, screen-reader behavior, prompt text/defaults, double-click behavior, and subjective usability remain for the controlled pilot. Offscreen evidence is not relabeled as Direct GUI test.
+**Execution Type: Direct GUI test; Historical Status: Not Run; Correction Status: Pass at actual 125%, Not Run at real 100%/150%.** The correction's nine-image visible no-save set passed at actual Windows 125%, covering default, 880x600, maximum applicability, header/data-row semantics, Blank/Broken manual overrides, Auto restoration, font pressure, and maximized states. Permanent STA automation supplied the mouse, Tab/Shift+Tab, scrolling, containment, and scrollbar assertions. The 1.50 font-pressure capture is not real 150% Windows scaling. Screen-reader behavior, prompts, double-click behavior, and full pilot usability remain open.
 
 ## Evidence summary
 
 | Evidence category | Status | What it supports |
 | --- | --- | --- |
-| Direct GUI test | Not Run | No visible desktop interaction was performed |
-| Service or harness test | Pass | 368 post-fix assertions with 0 failures; builds; local publish; startup smoke; V1/V2 services; offscreen forms; PDFs; transactions |
+| Historical Phase 10 Direct GUI test | Not Run | No visible desktop interaction was performed during the historical Phase 10 run |
+| Service or harness test | Pass for executed final scope | Semantic 7/7, deferred text 8/8, geometry 7/7, blocked-save/overwrite, paired PDF/index, and separate synthetic V1 regression passed |
 | Source inspection | Pass | Architecture/contracts, one-render call path, reentrancy, path/privacy boundaries, dependencies, diff scope, V1 isolation |
-| Manual test pending | Not Run | Visible GUI and scaling, dialogs/prompts, keyboard/accessibility, real ACL denial, abnormal termination, full published-GUI flow, controlled pilot |
+| Direct GUI test | Partial | Actual-125% visible no-save matrix and published startup passed; real 100%/150%, dialogs/prompts, screen-reader review, and full published-GUI save flow remain Not Run |
+| Manual test pending | Not Run | Real ACL denial, abnormal termination, correction-specific V1 workflow regression, controlled pilot, and authorization gates |
 
 The disposable harness assertion groups were: catalog/path/filename 32; clean initialization/metadata 42; metadata errors/recovery 29; moderate volume/search 7; V1 three-log-type regression 42; statistics/findings/validation 51; PDFs 11; paired save/overwrite/index 44; transaction faults 67; offscreen WinForms 43. Total: 368 assertions, 0 failures.
+
+### Evidence retained versus superseded by the P1 correction
+
+- Retained unless a fresh run finds otherwise: V1 isolation, metadata initialization/recovery, filename/path containment, transaction staging/rollback, overwrite matching, index syntax, render pagination hardening, publish-wrapper exit-code handling, and the fact that Hotel/PMS copies used identical bytes in the historical run.
+- Historical evidence superseded (current rerun status is in the correction record): Blank/Broken threshold boundaries, automatic/manual denominator propagation and validation, Full Name versus First/Last Name applicability, managed finding IDs and lifecycle, blank-Notes threshold-only suppression, nonblank-Notes preservation of contextual checklist Failure, proof that resolution alone is noncausal, handled-Failure overall status, readiness fingerprint invalidation, affected PDF content/order/status, index status, and the live Statistics/Readiness geometry and interaction matrix.
+- Current completed and pending evidence is recorded in `Pilot-Correction-Blank-Broken-Statistics.md`; no result should be inferred from a historical assertion count.
 
 ## Known limitations and remaining risks
 
@@ -175,24 +189,26 @@ The disposable harness assertion groups were: catalog/path/filename 32; clean in
 - No cross-process save lock; only one process may write to a documentation root during the pilot.
 - No automatic repair of a malformed QA index or normal-load repair of corrupt metadata.
 - Abnormal process or machine termination may leave a backup or transaction state that requires manual review; every abandoned backup is not automatically cleaned.
-- No permanent automated test project; Phase 10 used a disposable friend harness that is absent from the final worktree.
-- GUI evidence is limited to offscreen WinForms construction and control inspection; visible workflow behavior remains pending.
-- PDF visual evidence is bounded to five synthetic reports, the installed Windows font/GDI environment, and 144-DPI rendered output.
-- Windows 100%/125%/150% visible scaling and multi-monitor behavior remain pending.
+- Phase 10 used no permanent automated test project; its disposable friend harness is absent from the historical final worktree. The correction adds permanent focused semantic, STA geometry/interaction, and synthetic save/PDF/index coverage, all passing in Debug and Release. The test project is not included in the solution, so it must continue to be built/run explicitly.
+- Current correction GUI evidence includes passing STA geometry/interaction at actual 125% DPI and an accepted nine-image visible no-save set. This is not real 100%/150% evidence or a complete pilot workflow.
+- Historical PDF visual evidence is bounded to five synthetic reports and current correction review to three representative corrected renders in the installed Windows font/GDI environment. A direct permanent extracted-order assertion and rendered nonblank-Notes two-Failure variant remain open.
+- Actual Windows 125% visible no-save behavior passed; real 100%/150% scaling and multi-monitor behavior remain pending.
 - The real file-lock path passed, but permission-denied coverage used injected exceptions rather than an actual Windows ACL denial.
-- Published startup was process-level only; a complete visible workflow from the fresh local publish remains pending.
+- Corrected published startup passed visibly with a normal close and no save; a complete published paired-save workflow remains pending.
 - The self-contained Windows x64 single-file build still depends on the supported Windows/GDI/font environment for PDF rendering.
 - Path containment is lexical and is not a reparse-point/junction-aware security boundary.
 - V1 retains existing technical debt, including non-transactional daily-file/index saving and non-concurrency-safe ID allocation; Phase 10 did not refactor it.
 
 Pilot risks are therefore concentrated in visible usability/scaling, real-workstation permissions/fonts, operator handling of overwrite and recovery prompts, concurrent-process avoidance, and adherence to the privacy rules. These are bounded by the pilot guide's backup, single-process, stop, evidence, and synthetic-data guardrails.
 
-Release risks remain higher: the direct GUI/scaling matrix, controlled pilot, explicit merge authorization, post-merge verification, release approval, tag creation, and release actions have not occurred. The implementation commit has been independently inspected; the documentation-only correction commit remains subject to subsequent inspection and is not pre-approved.
+Release risks remain higher: real 100%/150% scaling, correction-specific V1 regression, controlled pilot, explicit commit/merge authorization, post-merge verification, release approval, tag creation, and release actions have not occurred. Independent review found no P0/P1 blocker and approved the local correction from a code-review standpoint, but that does not authorize any Git, package, pilot, merge, tag, or release action.
 
 ## Final recommendation and protected-state confirmation
 
-**Controlled pilot recommendation: Ready for controlled pilot.** Debug, Release, local publish, V1/V2 service regression, metadata, report rules, findings, statistics, PDF rendering, paired saving, overwrite, rollback, index, path, and privacy gates passed with no open confirmed defect. The complete pilot guide explicitly carries the outstanding visible-GUI, scaling, prompt, ACL, published-workflow, and operator checks.
+**Current recommendation:** Keep the frozen pilot package and Scenario 3 on hold. Use only the new immutable production candidate for independent review. Real 100%/150% DPI, merge, tag, and GitHub release remain open and require explicit authorization.
 
-**Merge-and-release recommendation: Not ready for merge and release.** Direct visible-GUI/scaling checks, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation remain incomplete.
+**Merge-and-release recommendation: Not ready for merge and release.** Real 100%/150% visible scaling, remaining prompt/full-GUI flows, the controlled pilot, explicit merge approval, post-merge testing, release approval, and tag creation remain incomplete.
 
-No new feature was added. No new package was added. Protected V1 output behavior was not changed. No merge occurred. No tag was created or moved. Version 2 has not been released. No commit or push occurred during the original Codex validation run; the completed Phase 10 work was later committed as `b0879645cde1b6a619accdea70abf7e08425dc22` and pushed only to `v2-qa-reports`.
+No new Phase 10 feature or package was added. Protected V1 output behavior was not changed. No merge occurred, no tag was created or moved, and Version 2 has not been released. Historical Phase 10 commits remain preserved; the exact final production-candidate commit is recorded in the external production manifest.
+
+The final correction audit reconfirmed `v2-qa-reports` at the approved baseline `d8f2eeeab6d7dea83c9c2924ccb2987645fc69cc` with `0 0` upstream divergence, `main` at `2f95d8a12c9b772124bd688d9a331e07730e5ab0`, and only tag `v1.0.0`. No dashboard/test process was running. The frozen pilot package retained its pre-correction hashes/timestamps, the live Retry-01 root retained five files with newest write `2026-07-17 14:26:06`, and V1 data, Git history, releases, dependencies, and deployment declarations were untouched.

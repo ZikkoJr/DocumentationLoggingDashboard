@@ -1,15 +1,43 @@
 Documentation Logging Dashboard
 ===============================
 
-Documentation Logging Dashboard is a small C# WinForms desktop application for
-creating consistent plain-text documentation logs. It supports previewing an
-entry, saving it to the correct daily .txt file, and appending a summary line to
-LogIndex.txt.
+Documentation Logging Dashboard is a C# WinForms desktop application for the
+three established V1 plain-text documentation logs and the V2 QA Report
+workflow. V1 entries retain their daily .txt files and LogIndex.txt. V2 creates
+paired Hotel/PMS PDF reports and a separate QA Report index.
+
+V2 QA Reports
+-------------
+
+Create QA Report supports Hotel/PMS metadata, a 28-item checklist, separate
+Blank and Broken statistics, findings, readiness validation, paired PDF saving,
+logical-report overwrite handling, and a dedicated QAReportIndex.txt.
+
+Blank and Broken thresholds are independent:
+
+- 0% creates no threshold finding.
+- Above 0% through 50%, inclusive, creates a Warning.
+- Above 50% creates a Failure.
+
+Blank counts describe missing cells. Broken counts describe invalid populated
+values, so blank cells do not fail populated-value checks. Automatic Blank
+denominators follow Total Data Rows. Automatic Broken denominators follow the
+matching Blank denominator minus Blank Count. Each denominator can be manually
+overridden and reset to Auto.
+
+Warning-only and handled-Failure reports save as Pass with Warnings. Active
+Failures save as Fail. A handled Failure retains Failure severity and remains in
+Failed Checks. Pending notes and other free text commit at validation/action
+boundaries, including before readiness and save. The Hotel and PMS copies are
+written from the same PDF bytes, and the QA index records the final status.
+
+The planned V2.1 enhancement "Route Debugging Logs into the applicable Hotel
+and PMS folders" is deferred. V2 does not change V1 Debugging Log routing.
 
 Supported log types
 -------------------
 
-The V1 app supports exactly three log types:
+The preserved V1 workflow supports exactly three log types:
 
 - Debugging Log
 - Script Editing Log
@@ -75,10 +103,10 @@ Examples:
 - EDIT-20260618-001
 - CREATE-20260618-001
 
-Output files
-------------
+V1 output files
+---------------
 
-The app writes plain .txt files only. Daily log files use:
+The V1 workflow writes plain .txt files only. Daily log files use:
 
 yyyy-MM-dd_FileNameSuffix.txt
 
@@ -158,22 +186,23 @@ Do not enter guest names, emails, payment data, credentials, or full hotel files
 into logs. Use ticket IDs, hotel IDs, script names, and summarized issues
 instead.
 
-How to build and run
---------------------
+How to build and run for development
+------------------------------------
 
 From the repository root, build the solution:
 
 dotnet build DocumentationLoggingDashboard.sln
 
-Run the app from Visual Studio, or run the built executable from:
+Run the app from Visual Studio, or run the built executable for development
+only from:
 
 DocumentationLoggingDashboard/bin/Debug/net10.0-windows/DocumentationLoggingDashboard.exe
 
-Publishing as a Windows executable
-----------------------------------
+Development publishing
+----------------------
 
-The app can be published as a local Windows x64 executable that launches by
-double-clicking the .exe.
+The script below creates a development publish. It is not the reviewed V2
+production-candidate package.
 
 From the repository root, run:
 
@@ -183,8 +212,13 @@ The published app is created under:
 
 PublishedApp\win-x64
 
-The final executable can be launched directly from:
+The development executable can be launched from:
 
 PublishedApp\win-x64\DocumentationLoggingDashboard.exe
 
-Release and shortcut details are in RELEASE_INSTRUCTIONS.txt.
+For production-candidate use, follow the START-HERE.txt file in the separately
+reviewed external folder named
+DocumentationLoggingDashboard-V2-Production-<SHORTSHA>. Do not use the
+repository, bin output, old V1 PublishedApp folder, or frozen pilot package as
+the production working application folder. Release details are in
+RELEASE_INSTRUCTIONS.txt.
