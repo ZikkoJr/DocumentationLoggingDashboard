@@ -44,6 +44,16 @@ public static class QaFindingIds
         return CreateForStatisticField("WARN:STAT:BLANK:", fieldId);
     }
 
+    public static string FailureForBlankStatistic(string fieldId)
+    {
+        return CreateForStatisticField("FAIL:STAT:BLANK:", fieldId);
+    }
+
+    public static string WarningForBrokenStatistic(string fieldId)
+    {
+        return CreateForStatisticField("WARN:STAT:BROKEN:", fieldId);
+    }
+
     public static string FailureForBrokenStatistic(string fieldId)
     {
         return CreateForStatisticField("FAIL:STAT:BROKEN:", fieldId);

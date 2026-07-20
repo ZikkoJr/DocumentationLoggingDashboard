@@ -6,6 +6,10 @@ Phase 2 defines the foundational QA report domain contract for Version 2. It add
 
 This phase does not add a working QA workflow. It does not add UI, dynamic applicability, validation, warning generation, failure generation, status calculation, custom-script evaluation, PDF generation, JSON serialization, storage, database access, raw-file parsing, spreadsheet parsing, or automation.
 
+> **Post-Phase-10 pilot correction:** Phase 2 remains the historical foundation, but the current runtime contract now gives every Blank and Broken denominator an explicit automatic/manual state. Missing mode properties default safely to Auto. Current threshold and propagation rules are defined in `Pilot-Correction-Blank-Broken-Statistics.md`; Phase 2's original “deferred” statements remain historical scope statements, not current runtime limitations.
+
+> **Deferred-text boundary:** The final V2 correction changes when QA report free text is committed, not the domain values or readiness fields themselves. Draft text is committed at validation or an explicit workflow/action boundary, then the existing domain synchronization runs once. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
+
 ## Architectural Principle
 
 The manual UI, future PDF renderer, and future automated diagnostic system must all use the same QA domain models and stable checklist identifiers. Those layers should not create separate representations of QA reports, checklist results, findings, or checklist IDs.
@@ -151,9 +155,9 @@ No UI, automatic matching, automatic resolution, script execution, or status cal
 
 Statistics groups are:
 
-- `QaFileInformationStatistics`: total data rows, whether headers are present, useful headers result, and data start row.
-- `QaBlankValueStatistic`: extensible per-field blank statistics with stable field identifier, display name, blank count, total applicable rows, and blank percentage.
-- `QaBrokenDataStatistic`: extensible per-field statistics for populated values containing malformed, corrupted, or otherwise incorrect data, with stable field identifier, display name, broken-value count, total applicable nonblank values, broken-data percentage, and optional explanation.
+- `QaFileInformationStatistics`: total data rows that contain data, whether headers are present, useful headers result, and data start row. Total Data Rows excludes header and preamble rows; the layout metadata does not trigger another subtraction.
+- `QaBlankValueStatistic`: extensible per-field blank statistics with stable field identifier, display name, blank count, total applicable rows, explicit automatic/manual denominator state, and blank percentage.
+- `QaBrokenDataStatistic`: extensible per-field statistics for populated values containing malformed, corrupted, or otherwise incorrect data, with stable field identifier, display name, broken-value count, total applicable nonblank values, explicit automatic/manual denominator state, broken-data percentage, and optional explanation.
 - `QaMultiwordNameStatistics`: multiword First Name count and percentage, plus multiword Last Name count and percentage.
 - `QaFileMonthStatistics`: Arrival Dates within the selected File Month, Arrival Dates outside it, percentage within, percentage outside, and valid Arrival Date count used as the denominator.
 - `QaUnusualMonetaryValueStatistics`: reusable representation for unusual Average Rate values and unusual Stay Values, including whether unusual values were found, count, percentage, and optional explanation.
@@ -166,12 +170,24 @@ Blank-value entries are extensible and can represent fields such as First Name, 
 
 Broken Data Statistics are separate from Blank Value Statistics. A `QaBlankValueStatistic` measures missing cells in an applicable field. A `QaBrokenDataStatistic` measures populated cells whose contents are malformed, corrupted, or otherwise incorrect. For example, a future process could supply entries for email addresses in name fields, malformed names, invalid nonblank dates, corrupted Confirmation Numbers, or invalid nonblank monetary values.
 
+In the corrected runtime workflow, an automatic Blank denominator follows the operator-entered Total Data Rows. That value is already the data-only count: for 120 occupied physical rows with a header on row 1 and data starting on row 2, Total Data Rows is `119`, not `120`. Headers Present and Data Start Row are descriptive metadata and do not cause another subtraction. An automatic Broken denominator follows the matching Blank denominator minus its Blank Count. A manual override is stored independently on each row and does not merge the two statistic types.
+
+Each reusable `QaBlankValueStatistic` entry contains:
+
+- `FieldId`: stable identifier for the applicable field.
+- `DisplayName`: human-readable field name.
+- `BlankValueCount`: integer count of blank cells.
+- `TotalApplicableRows`: displayed applicable-row denominator.
+- `UseAutomaticTotalApplicableRows`: `true` when the denominator follows Total Data Rows; `false` for a manual override.
+- `BlankValuePercentage`: `decimal` percentage on the shared `0` through `100` statistics scale.
+
 Each reusable `QaBrokenDataStatistic` entry contains:
 
 - `FieldId`: stable identifier for the applicable field.
 - `DisplayName`: human-readable field name.
 - `BrokenValueCount`: integer count of populated values identified as broken.
 - `TotalApplicableNonblankValues`: integer count of all applicable nonblank values for that field and the denominator represented by the entry. It does not include blank values.
+- `UseAutomaticTotalApplicableNonblankValues`: `true` when the denominator follows the matching Blank-derived nonblank population; `false` when the user has supplied a manual subset.
 - `BrokenDataPercentage`: `decimal` percentage on the shared `0` through `100` statistics scale.
 - optional `Explanation`: additional supplied context about the broken data.
 
@@ -221,9 +237,11 @@ Phase 2 stores applicability metadata but does not evaluate it. Conditional defi
 
 ## Warning Versus Failure
 
-A failure means a checklist requirement was not satisfied. Examples include a required field being absent, First Name containing email values, Arrival Date outside File Month, a DB value differing from the processed raw value, a required DB value being missing, or the Source/qualifying Rate/Market field being absent.
+A failure means a checklist requirement was not satisfied or a corrected statistics threshold is above 50%. Examples include a required field being absent, a populated-value validity condition with Broken Data above 50%, Arrival Date outside File Month, a DB value differing from the processed raw value, a required DB value being missing, or the Source/qualifying Rate/Market field being absent.
 
-A warning means the check may pass, but a suspicious or noteworthy condition is reported separately as a finding. Examples include Full Name used instead of separate name columns, more than two monetary columns, multiple Confirmation Number candidate columns, mixed Currency values when a Currency field exists, more than 50 percent blank values in an existing required field, Stay Value above 10,000 when high values are not expected, unusual Average Rate or Stay Value, raw/DB row-count difference of 10 or more, and an explained rejected database record.
+A warning means the check may pass, but a suspicious or noteworthy condition is reported separately as a finding. Corrected Blank and Broken percentages greater than 0% through 50%, inclusive, are Warnings. Other examples include Full Name used instead of separate name columns, more than two monetary columns, multiple Confirmation Number candidate columns, mixed Currency values when a Currency field exists, Stay Value above 10,000 when high values are not expected, unusual Average Rate or Stay Value, raw/DB row-count difference of 10 or more, and an explained rejected database record.
+
+Blank cells do not fail populated-value validity checks. An email address or unrelated populated value in First Name, Last Name, or Full Name is Broken Data; at or below 50% the validity check may remain Pass, while above 50% it must be Fail or readiness reports a contradiction.
 
 Specific catalog distinctions:
 
@@ -263,5 +281,5 @@ Manual UI and future automated diagnostics should populate `QaReport`, `QaCheckR
 
 ## Phase 2 Acceptance Criteria
 
-- The QA statistics contract represents blank-value counts and percentages, broken-data counts and percentages, and optional broken-data explanations, alongside the other defined statistics groups.
-- The QA statistics contract supports reusable Broken Data Statistics for any applicable field, including a stable field identifier, display name, broken-value count, total applicable nonblank values, broken-data percentage, and optional explanation.
+- The QA statistics contract represents blank-value counts, denominators, automatic/manual state and percentages, broken-data counts, denominators, automatic/manual state and percentages, and optional broken-data explanations, alongside the other defined statistics groups.
+- The QA statistics contract supports reusable Broken Data Statistics for any applicable field, including a stable field identifier, display name, broken-value count, total applicable nonblank values, denominator mode, broken-data percentage, and optional explanation.

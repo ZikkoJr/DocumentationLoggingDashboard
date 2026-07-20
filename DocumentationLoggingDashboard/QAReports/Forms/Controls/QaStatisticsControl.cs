@@ -25,6 +25,7 @@ public sealed class QaStatisticsControl : UserControl
     private readonly Dictionary<string, QaBrokenDataStatisticRowControl> brokenRowsById =
         new(StringComparer.Ordinal);
     private readonly List<Label> privacyReminderLabels = [];
+    private readonly HashSet<TextBox> pendingExplanationTextBoxes = [];
 
     private readonly NumericUpDown totalDataRowsNumericUpDown;
     private readonly ComboBox headersPresentComboBox;
@@ -77,6 +78,8 @@ public sealed class QaStatisticsControl : UserControl
 
     private QaReport? boundReport;
     private bool isRefreshing;
+    private bool isResizingContent;
+    private bool isResizeContentQueued;
 
     public QaStatisticsControl()
     {
@@ -116,7 +119,9 @@ public sealed class QaStatisticsControl : UserControl
         contentFlowLayoutPanel.Controls.Add(CreateGroup(
             "File Information",
             CreateWrappingMetrics(
-                CreateMetric("Total Data Rows", totalDataRowsNumericUpDown),
+                CreateMetric(
+                    "Total Data Rows (excluding header rows)",
+                    totalDataRowsNumericUpDown),
                 CreateMetric("Headers Present", headersPresentComboBox),
                 CreateMetric("Useful Headers", usefulHeadersComboBox),
                 CreateMetric("Data Start Row (0 = not entered)", dataStartRowNumericUpDown))));
@@ -321,6 +326,10 @@ public sealed class QaStatisticsControl : UserControl
 
         WireInputEvents();
         SizeChanged += (_, _) => ResizeContent();
+        VisibleChanged += (_, _) => ResizeContent();
+        FontChanged += (_, _) => ResizeContentAfterInheritedLayout();
+        DpiChangedAfterParent += (_, _) => ResizeContentAfterInheritedLayout();
+        contentFlowLayoutPanel.ClientSizeChanged += (_, _) => ResizeContent();
     }
 
     public event EventHandler? StatisticsChanged;
@@ -374,21 +383,15 @@ public sealed class QaStatisticsControl : UserControl
             unusualAverageRateComboBox.SelectedIndex == 1;
         statistics.UnusualAverageRateValues.UnusualValueCount =
             ToInt(unusualAverageRateCountNumericUpDown);
-        statistics.UnusualAverageRateValues.Explanation =
-            TrimToNull(unusualAverageRateExplanationTextBox.Text);
 
         statistics.UnusualStayValues.HasUnusualValues =
             unusualStayValueComboBox.SelectedIndex == 1;
         statistics.UnusualStayValues.UnusualValueCount =
             ToInt(unusualStayValueCountNumericUpDown);
-        statistics.UnusualStayValues.Explanation =
-            TrimToNull(unusualStayValueExplanationTextBox.Text);
         statistics.HighStayValues.StayValuesAboveTenThousandCount =
             ToInt(highStayValueCountNumericUpDown);
         statistics.HighStayValues.AreHighValuesExpected =
             highStayValuesExpectedComboBox.SelectedIndex == 1;
-        statistics.HighStayValues.Explanation =
-            TrimToNull(highStayValueExplanationTextBox.Text);
 
         statistics.Database.ImportedRecordCount =
             ToInt(importedRecordCountNumericUpDown);
@@ -397,27 +400,35 @@ public sealed class QaStatisticsControl : UserControl
         statistics.Database.RecordsWithMissingRequiredDatabaseValues =
             ToInt(missingRequiredDatabaseValuesNumericUpDown);
 
-        QaCheckResult? rejectedResult = report.ChecklistResults.FirstOrDefault(
-            result => result.CheckId.Equals(
-                QaChecklistIds.Database.RejectedRecordsAccountedFor,
-                StringComparison.Ordinal));
-        if (statistics.Database.RejectedRecordCount > 0 && rejectedResult is not null)
-        {
-            rejectedResult.Notes = TrimToNull(rejectedRecordsExplanationTextBox.Text);
-        }
-
-        QaFinding? rowDifferenceFinding = report.Findings.FirstOrDefault(
-            finding => finding.FindingId.Equals(
-                QaFindingIds.RowDifferenceStatisticWarning,
-                StringComparison.Ordinal));
-        if (rowDifferenceFinding is not null)
-        {
-            rowDifferenceFinding.ResolutionNotes =
-                TrimToNull(rowDifferenceExplanationTextBox.Text);
-        }
+        _ = CommitExplanationValues(report, pendingOnly: false);
 
         calculationService.Synchronize(report);
+        RefreshStatisticRowValues();
         RefreshCalculatedValues(report);
+    }
+
+    /// <summary>
+    /// Commits all dirty free-text explanations and raises one statistics event
+    /// after the completed batch.
+    /// </summary>
+    public bool CommitPendingTextEdits()
+    {
+        if (isRefreshing || boundReport is null)
+        {
+            return false;
+        }
+
+        QaReport report = GetBoundReport();
+        bool changed = CommitPendingTextEditsCore(report);
+
+        if (changed)
+        {
+            calculationService.Synchronize(report);
+            RefreshCalculatedValues(report);
+            StatisticsChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return changed;
     }
 
     public void RefreshFromReport()
@@ -460,7 +471,7 @@ public sealed class QaStatisticsControl : UserControl
             SetCount(
                 unusualAverageRateCountNumericUpDown,
                 statistics.UnusualAverageRateValues.UnusualValueCount);
-            SetOptionalText(
+            SetOptionalTextUnlessPending(
                 unusualAverageRateExplanationTextBox,
                 statistics.UnusualAverageRateValues.Explanation);
             unusualStayValueComboBox.SelectedIndex =
@@ -468,7 +479,7 @@ public sealed class QaStatisticsControl : UserControl
             SetCount(
                 unusualStayValueCountNumericUpDown,
                 statistics.UnusualStayValues.UnusualValueCount);
-            SetOptionalText(
+            SetOptionalTextUnlessPending(
                 unusualStayValueExplanationTextBox,
                 statistics.UnusualStayValues.Explanation);
             SetCount(
@@ -476,7 +487,7 @@ public sealed class QaStatisticsControl : UserControl
                 statistics.HighStayValues.StayValuesAboveTenThousandCount);
             highStayValuesExpectedComboBox.SelectedIndex =
                 statistics.HighStayValues.AreHighValuesExpected ? 1 : 0;
-            SetOptionalText(
+            SetOptionalTextUnlessPending(
                 highStayValueExplanationTextBox,
                 statistics.HighStayValues.Explanation);
 
@@ -490,7 +501,7 @@ public sealed class QaStatisticsControl : UserControl
                 finding => finding.FindingId.Equals(
                     QaFindingIds.RowDifferenceStatisticWarning,
                     StringComparison.Ordinal));
-            SetOptionalText(
+            SetOptionalTextUnlessPending(
                 rowDifferenceExplanationTextBox,
                 rowDifferenceFinding?.ResolutionNotes);
 
@@ -498,7 +509,7 @@ public sealed class QaStatisticsControl : UserControl
                 result => result.CheckId.Equals(
                     QaChecklistIds.Database.RejectedRecordsAccountedFor,
                     StringComparison.Ordinal));
-            SetOptionalText(
+            SetOptionalTextUnlessPending(
                 rejectedRecordsExplanationTextBox,
                 statistics.Database.RejectedRecordCount > 0
                     ? rejectedResult?.Notes
@@ -585,7 +596,9 @@ public sealed class QaStatisticsControl : UserControl
                     combo.SelectedIndexChanged += (_, _) => ApplyUserChanges();
                     break;
                 case TextBox text:
-                    text.TextChanged += (_, _) => ApplyUserChanges();
+                    text.TextChanged += (_, _) =>
+                        MarkExplanationEditPending(text);
+                    text.Validated += (_, _) => CommitPendingTextEdits();
                     break;
             }
         }
@@ -598,8 +611,113 @@ public sealed class QaStatisticsControl : UserControl
             return;
         }
 
+        _ = CommitPendingTextEditsCore(GetBoundReport());
         CommitCurrentValues();
         StatisticsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void MarkExplanationEditPending(TextBox textBox)
+    {
+        if (!isRefreshing && boundReport is not null)
+        {
+            pendingExplanationTextBoxes.Add(textBox);
+        }
+    }
+
+    private bool CommitPendingTextEditsCore(QaReport report)
+    {
+        bool changed = CommitExplanationValues(report, pendingOnly: true);
+
+        foreach (QaBrokenDataStatisticRowControl row in brokenRowsById.Values)
+        {
+            changed |= row.CommitPendingTextEditsWithoutNotification();
+        }
+
+        return changed;
+    }
+
+    private bool CommitExplanationValues(QaReport report, bool pendingOnly)
+    {
+        bool changed = false;
+        QaStatistics statistics = report.Statistics;
+
+        changed |= CommitOptionalText(
+            unusualAverageRateExplanationTextBox,
+            statistics.UnusualAverageRateValues.Explanation,
+            value => statistics.UnusualAverageRateValues.Explanation = value,
+            pendingOnly);
+        changed |= CommitOptionalText(
+            unusualStayValueExplanationTextBox,
+            statistics.UnusualStayValues.Explanation,
+            value => statistics.UnusualStayValues.Explanation = value,
+            pendingOnly);
+        changed |= CommitOptionalText(
+            highStayValueExplanationTextBox,
+            statistics.HighStayValues.Explanation,
+            value => statistics.HighStayValues.Explanation = value,
+            pendingOnly);
+
+        QaFinding? rowDifferenceFinding = report.Findings.FirstOrDefault(
+            finding => finding.FindingId.Equals(
+                QaFindingIds.RowDifferenceStatisticWarning,
+                StringComparison.Ordinal));
+        if (rowDifferenceFinding is not null)
+        {
+            changed |= CommitOptionalText(
+                rowDifferenceExplanationTextBox,
+                rowDifferenceFinding.ResolutionNotes,
+                value => rowDifferenceFinding.ResolutionNotes = value,
+                pendingOnly);
+        }
+        else if (!pendingOnly)
+        {
+            pendingExplanationTextBoxes.Remove(rowDifferenceExplanationTextBox);
+        }
+
+        QaCheckResult? rejectedResult = report.ChecklistResults.FirstOrDefault(
+            result => result.CheckId.Equals(
+                QaChecklistIds.Database.RejectedRecordsAccountedFor,
+                StringComparison.Ordinal));
+        if (statistics.Database.RejectedRecordCount > 0 && rejectedResult is not null)
+        {
+            changed |= CommitOptionalText(
+                rejectedRecordsExplanationTextBox,
+                rejectedResult.Notes,
+                value => rejectedResult.Notes = value,
+                pendingOnly);
+        }
+        else if (!pendingOnly)
+        {
+            pendingExplanationTextBoxes.Remove(rejectedRecordsExplanationTextBox);
+        }
+
+        return changed;
+    }
+
+    private bool CommitOptionalText(
+        TextBox control,
+        string? modelValue,
+        Action<string?> applyValue,
+        bool pendingOnly)
+    {
+        if (pendingOnly && !pendingExplanationTextBoxes.Contains(control))
+        {
+            return false;
+        }
+
+        string? normalizedValue = TrimToNull(control.Text);
+        bool changed = !string.Equals(
+            modelValue,
+            normalizedValue,
+            StringComparison.Ordinal);
+
+        if (changed)
+        {
+            applyValue(normalizedValue);
+        }
+
+        pendingExplanationTextBoxes.Remove(control);
+        return changed;
     }
 
     private void ReconcileBlankRows(IEnumerable<QaBlankValueStatistic> statistics)
@@ -655,6 +773,7 @@ public sealed class QaStatisticsControl : UserControl
             }
 
             row.StatisticChanged -= StatisticRow_StatisticChanged;
+            row.DiscardPendingTextEdits();
             brokenRowsFlowLayoutPanel.Controls.Remove(row);
             row.Dispose();
             brokenRowsById.Remove(id);
@@ -681,6 +800,19 @@ public sealed class QaStatisticsControl : UserControl
     private void StatisticRow_StatisticChanged(object? sender, EventArgs eventArgs)
     {
         ApplyUserChanges();
+    }
+
+    private void RefreshStatisticRowValues()
+    {
+        foreach (QaBlankStatisticRowControl row in blankRowsById.Values)
+        {
+            row.RefreshFromStatistic();
+        }
+
+        foreach (QaBrokenDataStatisticRowControl row in brokenRowsById.Values)
+        {
+            row.RefreshFromStatistic();
+        }
     }
 
     private void RefreshCalculatedValues(QaReport report)
@@ -753,33 +885,190 @@ public sealed class QaStatisticsControl : UserControl
 
     private void ResizeContent()
     {
-        int width = Math.Max(
-            560,
-            contentFlowLayoutPanel.ClientSize.Width
-                - contentFlowLayoutPanel.Padding.Horizontal
-                - SystemInformation.VerticalScrollBarWidth
-                - 6);
-
-        foreach (Control control in contentFlowLayoutPanel.Controls)
+        if (isResizingContent || contentFlowLayoutPanel.ClientSize.Width <= 0)
         {
-            control.Width = width;
+            return;
         }
 
-        foreach (QaBlankStatisticRowControl row in blankRowsById.Values)
+        isResizingContent = true;
+
+        try
         {
-            row.Width = Math.Max(520, width - 24);
+            // A vertical scrollbar can change the live display width during this
+            // layout. A bounded second/third pass consumes that change without
+            // allowing Layout events raised below to recurse.
+            for (int pass = 0; pass < 3; pass++)
+            {
+                contentFlowLayoutPanel.PerformLayout();
+                int width = GetStatisticsViewportWidth();
+                if (width <= 0)
+                {
+                    return;
+                }
+
+                foreach (GroupBox groupBox in contentFlowLayoutPanel.Controls
+                             .OfType<GroupBox>())
+                {
+                    groupBox.Width = Math.Max(
+                        groupBox.MinimumSize.Width,
+                        width - groupBox.Margin.Horizontal);
+                    groupBox.PerformLayout();
+                    ResizeNestedGroupWidths(groupBox);
+                }
+
+                ResizeStatisticRows();
+                ResizePrivacyReminders();
+                ResizeGroupsToContent(contentFlowLayoutPanel);
+                contentFlowLayoutPanel.PerformLayout();
+
+                if (GetStatisticsViewportWidth() == width)
+                {
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            isResizingContent = false;
+        }
+    }
+
+    private void ResizeContentAfterInheritedLayout()
+    {
+        ResizeContent();
+
+        if (!IsHandleCreated || IsDisposed || Disposing || isResizeContentQueued)
+        {
+            return;
         }
 
-        foreach (QaBrokenDataStatisticRowControl row in brokenRowsById.Values)
+        isResizeContentQueued = true;
+        BeginInvoke((Action)(() =>
         {
-            row.Width = Math.Max(520, width - 24);
-        }
+            isResizeContentQueued = false;
+            if (!IsDisposed && !Disposing)
+            {
+                ResizeContent();
+            }
+        }));
+    }
 
-        int reminderWidth = Math.Max(320, width - 40);
+    private int GetStatisticsViewportWidth()
+    {
+        int clientDisplayWidth = Math.Max(
+            0,
+            contentFlowLayoutPanel.ClientRectangle.Width
+                - contentFlowLayoutPanel.Padding.Horizontal);
+        int displayWidth = Math.Max(0, contentFlowLayoutPanel.DisplayRectangle.Width);
+
+        return displayWidth == 0
+            ? clientDisplayWidth
+            : Math.Min(clientDisplayWidth, displayWidth);
+    }
+
+    private static void ResizeNestedGroupWidths(Control container)
+    {
+        foreach (Control child in container.Controls)
+        {
+            if (child is GroupBox groupBox)
+            {
+                int availableWidth = Math.Max(
+                    0,
+                    container.DisplayRectangle.Width - groupBox.Margin.Horizontal);
+                if (availableWidth > 0)
+                {
+                    groupBox.Width = Math.Max(
+                        groupBox.MinimumSize.Width,
+                        availableWidth);
+                    groupBox.PerformLayout();
+                }
+            }
+
+            ResizeNestedGroupWidths(child);
+        }
+    }
+
+    private void ResizeStatisticRows()
+    {
+        ResizeStatisticRows(blankRowsFlowLayoutPanel, blankRowsById.Values);
+        ResizeStatisticRows(brokenRowsFlowLayoutPanel, brokenRowsById.Values);
+    }
+
+    private static void ResizeStatisticRows<T>(
+        FlowLayoutPanel parent,
+        IEnumerable<T> rows)
+        where T : Control
+    {
+        parent.PerformLayout();
+
+        foreach (T row in rows)
+        {
+            int availableWidth = Math.Max(
+                row.MinimumSize.Width,
+                parent.DisplayRectangle.Width - row.Margin.Horizontal);
+            row.Width = availableWidth;
+        }
+    }
+
+    private void ResizePrivacyReminders()
+    {
         foreach (Label reminder in privacyReminderLabels)
         {
-            reminder.MaximumSize = new Size(reminderWidth, 0);
+            Control? parent = reminder.Parent;
+            if (parent is null)
+            {
+                continue;
+            }
+
+            int availableWidth = Math.Max(
+                0,
+                parent.DisplayRectangle.Width - reminder.Margin.Horizontal);
+            if (availableWidth > 0)
+            {
+                reminder.MaximumSize = new Size(availableWidth, 0);
+            }
         }
+    }
+
+    private static void ResizeGroupsToContent(Control container)
+    {
+        foreach (Control child in container.Controls)
+        {
+            ResizeGroupsToContent(child);
+        }
+
+        if (container is not GroupBox groupBox || groupBox.Controls.Count == 0)
+        {
+            return;
+        }
+
+        groupBox.PerformLayout();
+        int contentWidth = groupBox.DisplayRectangle.Width;
+        if (contentWidth <= 0)
+        {
+            return;
+        }
+
+        int requiredBottom = groupBox.DisplayRectangle.Top;
+        foreach (Control content in groupBox.Controls)
+        {
+            content.Width = Math.Max(
+                content.MinimumSize.Width,
+                contentWidth - content.Margin.Horizontal);
+            content.PerformLayout();
+
+            Size preferredSize = content.GetPreferredSize(
+                new Size(content.Width, 0));
+            content.Height = Math.Max(
+                content.MinimumSize.Height,
+                preferredSize.Height);
+            content.PerformLayout();
+            requiredBottom = Math.Max(requiredBottom, content.Bottom);
+        }
+
+        groupBox.Height = Math.Max(
+            groupBox.MinimumSize.Height,
+            requiredBottom + groupBox.Padding.Bottom);
     }
 
     private QaReport GetBoundReport()
@@ -976,8 +1265,7 @@ public sealed class QaStatisticsControl : UserControl
     {
         GroupBox groupBox = new()
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            AutoSize = false,
             Margin = new Padding(0, 0, 0, 10),
             MinimumSize = new Size(560, 0),
             Padding = new Padding(10),
@@ -1029,6 +1317,14 @@ public sealed class QaStatisticsControl : UserControl
                 StringComparison.Ordinal))
         {
             control.Text = modelValue ?? string.Empty;
+        }
+    }
+
+    private void SetOptionalTextUnlessPending(TextBox control, string? modelValue)
+    {
+        if (!pendingExplanationTextBoxes.Contains(control))
+        {
+            SetOptionalText(control, modelValue);
         }
     }
 

@@ -31,6 +31,7 @@ public partial class QaReportForm : Form
     private readonly QaFindingSynchronizationService findingSynchronizationService;
     private readonly QaStatisticsCalculationService statisticsCalculationService = new();
     private readonly QaReportValidationService reportValidationService = new();
+    private readonly HashSet<TextBox> pendingReportTextBoxes = [];
 
     private IReadOnlyList<QaPmsMetadata> pmsSystems;
     private IReadOnlyList<QaHotelMetadata> hotels;
@@ -38,6 +39,7 @@ public partial class QaReportForm : Form
     private bool isInitializingPhase7 = true;
     private bool isCheckingReportReadiness;
     private bool isSavingQaReport;
+    private bool isCommittingAllPendingTextEdits;
     private bool hasReadinessResult;
 
     public QaReportForm(
@@ -227,12 +229,9 @@ public partial class QaReportForm : Form
 
         fileMonthPicker.ValueChanged += (_, _) => SynchronizeFileMonth();
         qaDatePicker.ValueChanged += (_, _) => SynchronizeQaDate();
-        createdByTextBox.TextChanged += (_, _) =>
-            CurrentReport.CreatedBy = TrimToNull(createdByTextBox.Text);
-        originalFileNameTextBox.TextChanged += (_, _) =>
-            CurrentReport.OriginalFileName = TrimToNull(originalFileNameTextBox.Text);
-        generalNotesTextBox.TextChanged += (_, _) =>
-            CurrentReport.GeneralNotes = TrimToNull(generalNotesTextBox.Text);
+        WireDeferredReportTextBox(createdByTextBox);
+        WireDeferredReportTextBox(originalFileNameTextBox);
+        WireDeferredReportTextBox(generalNotesTextBox);
 
         separateNameColumnsRadioButton.CheckedChanged += (_, _) =>
             SynchronizeCharacteristicsWhenChecked(separateNameColumnsRadioButton);
@@ -269,8 +268,14 @@ public partial class QaReportForm : Form
             ResizeFindingControls(warningsFlowLayoutPanel);
         failedChecksFlowLayoutPanel.SizeChanged += (_, _) =>
             ResizeFindingControls(failedChecksFlowLayoutPanel);
+        generateAndSaveQaReportButton.CausesValidation = false;
+        generateAndSaveQaReportButton.Enter += (_, _) =>
+            CommitAllPendingTextEdits(refreshChildUi: false);
         generateAndSaveQaReportButton.Click += (_, _) =>
             GenerateAndSaveQaReport();
+        reportTabControl.Selecting += (_, _) =>
+            CommitAllPendingTextEdits();
+        FormClosing += (_, _) => CommitAllPendingTextEdits();
 
         WirePhase7Events();
     }
@@ -279,9 +284,167 @@ public partial class QaReportForm : Form
     {
         SynchronizeFileMonth();
         SynchronizeQaDate();
-        CurrentReport.CreatedBy = TrimToNull(createdByTextBox.Text);
-        CurrentReport.OriginalFileName = TrimToNull(originalFileNameTextBox.Text);
-        CurrentReport.GeneralNotes = TrimToNull(generalNotesTextBox.Text);
+        _ = CommitPendingReportTextEdits();
+    }
+
+    private void WireDeferredReportTextBox(TextBox textBox)
+    {
+        textBox.TextChanged += (_, _) => MarkReportTextEditPending(textBox);
+        textBox.Validated += (_, _) => CommitPendingReportTextEdit(textBox);
+    }
+
+    private void MarkReportTextEditPending(TextBox textBox)
+    {
+        if (pendingReportTextBoxes.Add(textBox))
+        {
+            InvalidateReportReadiness();
+        }
+    }
+
+    private bool CommitPendingReportTextEdit(TextBox textBox)
+    {
+        if (!pendingReportTextBoxes.Remove(textBox))
+        {
+            return false;
+        }
+
+        string? value = TrimToNull(textBox.Text);
+
+        if (ReferenceEquals(textBox, createdByTextBox))
+        {
+            return ApplyReportTextValue(
+                CurrentReport.CreatedBy,
+                value,
+                committed => CurrentReport.CreatedBy = committed);
+        }
+
+        if (ReferenceEquals(textBox, originalFileNameTextBox))
+        {
+            return ApplyReportTextValue(
+                CurrentReport.OriginalFileName,
+                value,
+                committed => CurrentReport.OriginalFileName = committed);
+        }
+
+        if (ReferenceEquals(textBox, generalNotesTextBox))
+        {
+            return ApplyReportTextValue(
+                CurrentReport.GeneralNotes,
+                value,
+                committed => CurrentReport.GeneralNotes = committed);
+        }
+
+        throw new InvalidOperationException(
+            "An unregistered report text box had a pending edit.");
+    }
+
+    private bool CommitPendingReportTextEdits()
+    {
+        bool changed = false;
+
+        foreach (TextBox textBox in pendingReportTextBoxes.ToArray())
+        {
+            changed |= CommitPendingReportTextEdit(textBox);
+        }
+
+        return changed;
+    }
+
+    private static bool ApplyReportTextValue(
+        string? modelValue,
+        string? committedValue,
+        Action<string?> applyValue)
+    {
+        if (string.Equals(modelValue, committedValue, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        applyValue(committedValue);
+        return true;
+    }
+
+    /// <summary>
+    /// Flushes every deferred QA report text field. Child notifications are
+    /// suppressed while the batch is collected so an action boundary performs at
+    /// most one findings/statistics refresh.
+    /// </summary>
+    public bool CommitAllPendingTextEdits()
+    {
+        return CommitAllPendingTextEdits(refreshChildUi: true);
+    }
+
+    private bool CommitAllPendingTextEdits(bool refreshChildUi)
+    {
+        if (isCommittingAllPendingTextEdits)
+        {
+            return false;
+        }
+
+        bool changed = false;
+        bool reportTextChanged = false;
+        bool childModelChanged = false;
+        isCommittingAllPendingTextEdits = true;
+
+        try
+        {
+            reportTextChanged = CommitPendingReportTextEdits();
+            changed |= reportTextChanged;
+
+            foreach (QaChecklistItemControl itemControl
+                     in checklistControlsById.Values)
+            {
+                childModelChanged |= itemControl.CommitPendingTextEdits();
+            }
+
+            foreach (QaFindingItemControl itemControl
+                     in findingControlsById.Values)
+            {
+                childModelChanged |= itemControl.CommitPendingTextEdits();
+            }
+
+            childModelChanged |= statisticsControl.CommitPendingTextEdits();
+            changed |= childModelChanged;
+
+            if (childModelChanged && refreshChildUi)
+            {
+                bool wasSynchronizingFindings = isSynchronizingFindings;
+                isSynchronizingFindings = true;
+
+                try
+                {
+                    SynchronizeAllChecklistWarningSelections();
+                    SynchronizeFindingsAndRefreshUiCore();
+                }
+                finally
+                {
+                    isSynchronizingFindings = wasSynchronizingFindings;
+                }
+            }
+        }
+        finally
+        {
+            isCommittingAllPendingTextEdits = false;
+        }
+
+        if (childModelChanged)
+        {
+            InvalidateReportReadiness();
+        }
+
+        return changed;
+    }
+
+    private void SynchronizeAllChecklistWarningSelections()
+    {
+        foreach ((string checkId, QaChecklistItemControl itemControl)
+                 in checklistControlsById)
+        {
+            findingSynchronizationService.SetChecklistWarningSelected(
+                CurrentReport,
+                checkId,
+                itemControl.WarningFound);
+        }
     }
 
     private void SynchronizeFileMonth()
@@ -324,6 +487,8 @@ public partial class QaReportForm : Form
 
     private void OpenMetadataManagement()
     {
+        _ = CommitAllPendingTextEdits();
+
         try
         {
             using QaMetadataManagementForm form = new(
@@ -457,7 +622,7 @@ public partial class QaReportForm : Form
         object? sender,
         EventArgs eventArgs)
     {
-        if (isSynchronizingFindings)
+        if (isSynchronizingFindings || isCommittingAllPendingTextEdits)
         {
             return;
         }
@@ -476,6 +641,7 @@ public partial class QaReportForm : Form
 
         try
         {
+            _ = CommitAllPendingTextEdits(refreshChildUi: false);
             findingSynchronizationService.SetChecklistWarningSelected(
                 CurrentReport,
                 itemControl.CheckId,
@@ -509,6 +675,7 @@ public partial class QaReportForm : Form
 
         try
         {
+            _ = CommitAllPendingTextEdits(refreshChildUi: false);
             QaFileCharacteristics characteristics = CurrentReport.FileCharacteristics;
 
             characteristics.NameColumnMode = fullNameColumnRadioButton.Checked
@@ -573,6 +740,7 @@ public partial class QaReportForm : Form
 
         try
         {
+            _ = CommitAllPendingTextEdits(refreshChildUi: false);
             SynchronizeFindingsAndRefreshUiCore();
         }
         finally
@@ -624,6 +792,7 @@ public partial class QaReportForm : Form
                 }
 
                 itemControl.FindingChanged -= FindingItemControl_FindingChanged;
+                itemControl.DiscardPendingTextEdits();
                 itemControl.Parent?.Controls.Remove(itemControl);
                 itemControl.Dispose();
                 findingControlsById.Remove(findingId);
@@ -702,6 +871,11 @@ public partial class QaReportForm : Form
         object? sender,
         EventArgs eventArgs)
     {
+        if (isCommittingAllPendingTextEdits)
+        {
+            return;
+        }
+
         if (sender is not QaFindingItemControl itemControl
             || !findingControlsById.TryGetValue(
                 itemControl.FindingId,
@@ -739,13 +913,11 @@ public partial class QaReportForm : Form
 
     private void WirePhase7Events()
     {
-        createdByTextBox.TextChanged += (_, _) => InvalidateReportReadiness();
-        originalFileNameTextBox.TextChanged += (_, _) =>
-            InvalidateReportReadiness();
-        generalNotesTextBox.TextChanged += (_, _) =>
-            InvalidateReportReadiness();
         statisticsControl.StatisticsChanged +=
             StatisticsControl_StatisticsChanged;
+        checkReportReadinessButton.CausesValidation = false;
+        checkReportReadinessButton.Enter += (_, _) =>
+            CommitAllPendingTextEdits(refreshChildUi: false);
         checkReportReadinessButton.Click += (_, _) =>
             CheckReportReadiness();
     }
@@ -754,7 +926,9 @@ public partial class QaReportForm : Form
         object? sender,
         EventArgs eventArgs)
     {
-        if (isSynchronizingFindings || isCheckingReportReadiness)
+        if (isSynchronizingFindings
+            || isCheckingReportReadiness
+            || isCommittingAllPendingTextEdits)
         {
             return;
         }
@@ -763,6 +937,7 @@ public partial class QaReportForm : Form
 
         try
         {
+            _ = CommitAllPendingTextEdits(refreshChildUi: false);
             statisticsControl.CommitCurrentValues();
             statisticsCalculationService.Synchronize(CurrentReport);
             SynchronizeRejectedRecordsCharacteristicFromStatistics();
@@ -810,6 +985,7 @@ public partial class QaReportForm : Form
 
         try
         {
+            _ = CommitAllPendingTextEdits(refreshChildUi: false);
             SynchronizeHotelSelection();
             SynchronizeReportInputs();
             statisticsControl.CommitCurrentValues();

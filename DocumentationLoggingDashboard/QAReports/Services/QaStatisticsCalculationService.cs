@@ -22,6 +22,9 @@ public sealed class QaStatisticsCalculationService
         QaFileCharacteristics characteristics = report.FileCharacteristics
             ?? throw new InvalidOperationException(
                 "The QA report must have file characteristics before statistics can be synchronized.");
+        QaFileInformationStatistics fileInformation = statistics.FileInformation
+            ?? throw new InvalidOperationException(
+                "The QA report must have File Information statistics.");
 
         Dictionary<string, QaBlankValueStatistic> blankById =
             IndexBlankStatistics(statistics.BlankValues);
@@ -50,6 +53,11 @@ public sealed class QaStatisticsCalculationService
 
             statistic.FieldId = definition.Id;
             statistic.DisplayName = definition.DisplayName;
+            if (statistic.UseAutomaticTotalApplicableRows)
+            {
+                statistic.TotalApplicableRows = fileInformation.TotalDataRows;
+            }
+
             statistic.BlankPercentage = CalculatePercentage(
                 statistic.BlankCount,
                 statistic.TotalApplicableRows);
@@ -89,8 +97,11 @@ public sealed class QaStatisticsCalculationService
 
             statistic.FieldId = definition.Id;
             statistic.DisplayName = definition.DisplayName;
-            statistic.TotalApplicableNonblankValues =
-                Math.Max(0, derivedNonblankCount);
+            if (statistic.UseAutomaticTotalApplicableNonblankValues)
+            {
+                statistic.TotalApplicableNonblankValues = derivedNonblankCount;
+            }
+
             statistic.BrokenDataPercentage = CalculatePercentage(
                 statistic.BrokenValueCount,
                 statistic.TotalApplicableNonblankValues);
@@ -108,10 +119,6 @@ public sealed class QaStatisticsCalculationService
         QaDatabaseStatistics database = statistics.Database
             ?? throw new InvalidOperationException(
                 "The QA report must have database statistics.");
-        QaFileInformationStatistics fileInformation = statistics.FileInformation
-            ?? throw new InvalidOperationException(
-                "The QA report must have File Information statistics.");
-
         database.RawMinusImportedRecordCountDifference =
             CalculateRawMinusImportedDifference(
                 fileInformation.TotalDataRows,
@@ -123,6 +130,24 @@ public sealed class QaStatisticsCalculationService
         return denominator <= 0
             ? 0m
             : decimal.Round(numerator * 100m / denominator, 2);
+    }
+
+    /// <summary>
+    /// Classifies a positive statistic using the unrounded counts so a very small
+    /// nonzero percentage cannot disappear when its display rounds to 0.00%.
+    /// </summary>
+    public static QaFindingSeverity? ClassifyThreshold(
+        int numerator,
+        int denominator)
+    {
+        if (numerator <= 0 || denominator <= 0)
+        {
+            return null;
+        }
+
+        return (long)numerator * 2L <= denominator
+            ? QaFindingSeverity.Warning
+            : QaFindingSeverity.Failure;
     }
 
     /// <summary>

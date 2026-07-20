@@ -11,6 +11,7 @@ public sealed class QaBlankStatisticRowControl : UserControl
     private readonly Label fieldNameLabel;
     private readonly NumericUpDown blankCountNumericUpDown;
     private readonly NumericUpDown totalRowsNumericUpDown;
+    private readonly CheckBox automaticTotalRowsCheckBox;
     private readonly TextBox percentageTextBox;
 
     private QaBlankValueStatistic? boundStatistic;
@@ -36,6 +37,8 @@ public sealed class QaBlankStatisticRowControl : UserControl
 
         blankCountNumericUpDown = CreateCountInput("Blank count");
         totalRowsNumericUpDown = CreateCountInput("Total applicable rows");
+        automaticTotalRowsCheckBox = CreateAutomaticCheckBox(
+            "Use Total Data Rows automatically");
         percentageTextBox = CreateReadOnlyValue("Blank percentage");
 
         FlowLayoutPanel metricsPanel = new()
@@ -52,7 +55,9 @@ public sealed class QaBlankStatisticRowControl : UserControl
             blankCountNumericUpDown));
         metricsPanel.Controls.Add(CreateMetricPanel(
             "Total applicable rows",
-            totalRowsNumericUpDown));
+            CreateDenominatorEditor(
+                totalRowsNumericUpDown,
+                automaticTotalRowsCheckBox)));
         metricsPanel.Controls.Add(CreateMetricPanel(
             "Blank percentage",
             percentageTextBox));
@@ -75,7 +80,10 @@ public sealed class QaBlankStatisticRowControl : UserControl
         Controls.Add(mainLayoutPanel);
 
         blankCountNumericUpDown.ValueChanged += (_, _) => ApplyUserValues();
-        totalRowsNumericUpDown.ValueChanged += (_, _) => ApplyUserValues();
+        totalRowsNumericUpDown.ValueChanged += (_, _) =>
+            ApplyManualDenominatorValue();
+        automaticTotalRowsCheckBox.CheckedChanged += (_, _) =>
+            ApplyUserValues();
     }
 
     public string FieldId => boundStatistic?.FieldId ?? string.Empty;
@@ -111,11 +119,15 @@ public sealed class QaBlankStatisticRowControl : UserControl
                 $"Blank count for {statistic.DisplayName}";
             totalRowsNumericUpDown.AccessibleName =
                 $"Total applicable rows for {statistic.DisplayName}";
+            automaticTotalRowsCheckBox.AccessibleName =
+                $"Use Total Data Rows automatically for {statistic.DisplayName}";
             percentageTextBox.AccessibleName =
                 $"Calculated blank percentage for {statistic.DisplayName}";
 
             SetCountValue(blankCountNumericUpDown, statistic.BlankCount);
             SetCountValue(totalRowsNumericUpDown, statistic.TotalApplicableRows);
+            automaticTotalRowsCheckBox.Checked =
+                statistic.UseAutomaticTotalApplicableRows;
             percentageTextBox.Text = FormatPercentage(statistic.BlankPercentage);
         }
         finally
@@ -129,6 +141,8 @@ public sealed class QaBlankStatisticRowControl : UserControl
         QaBlankValueStatistic statistic = GetBoundStatistic();
         statistic.BlankCount = decimal.ToInt32(blankCountNumericUpDown.Value);
         statistic.TotalApplicableRows = decimal.ToInt32(totalRowsNumericUpDown.Value);
+        statistic.UseAutomaticTotalApplicableRows =
+            automaticTotalRowsCheckBox.Checked;
         statistic.BlankPercentage =
             QaStatisticsCalculationService.CalculatePercentage(
                 statistic.BlankCount,
@@ -145,6 +159,27 @@ public sealed class QaBlankStatisticRowControl : UserControl
 
         CommitCurrentValues();
         StatisticChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyManualDenominatorValue()
+    {
+        if (isRefreshing || boundStatistic is null)
+        {
+            return;
+        }
+
+        isRefreshing = true;
+
+        try
+        {
+            automaticTotalRowsCheckBox.Checked = false;
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
+
+        ApplyUserValues();
     }
 
     private QaBlankValueStatistic GetBoundStatistic()
@@ -176,6 +211,39 @@ public sealed class QaBlankStatisticRowControl : UserControl
             TabStop = false,
             Text = "0.00%"
         };
+    }
+
+    private static CheckBox CreateAutomaticCheckBox(string accessibleName)
+    {
+        return new CheckBox
+        {
+            AccessibleDescription =
+                "Clear Auto to keep a manual denominator. Select Auto to use the current Total Data Rows value.",
+            AccessibleName = accessibleName,
+            AutoSize = true,
+            Checked = true,
+            Margin = new Padding(7, 3, 0, 0),
+            Name = "automaticTotalRowsCheckBox",
+            Text = "Auto"
+        };
+    }
+
+    private static Control CreateDenominatorEditor(
+        NumericUpDown valueControl,
+        CheckBox automaticCheckBox)
+    {
+        FlowLayoutPanel panel = new()
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = Padding.Empty,
+            WrapContents = false
+        };
+        valueControl.Margin = Padding.Empty;
+        panel.Controls.Add(valueControl);
+        panel.Controls.Add(automaticCheckBox);
+        return panel;
     }
 
     private static Control CreateMetricPanel(string labelText, Control valueControl)

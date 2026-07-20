@@ -9,6 +9,8 @@ public partial class QaFindingItemControl : UserControl
 {
     private QaFinding? boundFinding;
     private bool customScriptSupportAvailable;
+    private bool hasPendingCustomScriptNameEdit;
+    private bool hasPendingResolutionNotesEdit;
     private bool isSynchronizing;
 
     public QaFindingItemControl()
@@ -28,9 +30,13 @@ public partial class QaFindingItemControl : UserControl
                 QaFindingResolution.ExplainedAndAccepted,
                 explainedAndAcceptedRadioButton.Checked);
         customScriptNameTextBox.TextChanged += (_, _) =>
-            ApplyCustomScriptName();
+            MarkCustomScriptNameEditPending();
+        customScriptNameTextBox.Validated += (_, _) =>
+            CommitPendingTextEdits();
         resolutionNotesTextBox.TextChanged += (_, _) =>
-            ApplyResolutionNotes();
+            MarkResolutionNotesEditPending();
+        resolutionNotesTextBox.Validated += (_, _) =>
+            CommitPendingTextEdits();
         SizeChanged += (_, _) => UpdateWrappingWidths();
     }
 
@@ -62,8 +68,29 @@ public partial class QaFindingItemControl : UserControl
         ValidateResolution(finding.Resolution);
 
         bool bindingChanged = !ReferenceEquals(boundFinding, finding);
+
+        if (bindingChanged && boundFinding is not null)
+        {
+            bool sameFindingId = boundFinding.FindingId.Equals(
+                finding.FindingId,
+                StringComparison.Ordinal);
+            _ = CommitPendingTextEditsCore(raiseFindingChanged: false);
+
+            if (sameFindingId)
+            {
+                finding.CustomScriptName = boundFinding.CustomScriptName;
+                finding.ResolutionNotes = boundFinding.ResolutionNotes;
+            }
+        }
+
         boundFinding = finding;
         customScriptSupportAvailable = isCustomScriptSupportAvailable;
+
+        if (bindingChanged)
+        {
+            hasPendingCustomScriptNameEdit = false;
+            hasPendingResolutionNotesEdit = false;
+        }
 
         NormalizeBoundFinding();
         SynchronizeFromFinding(relatedCheckDisplayName, bindingChanged);
@@ -83,6 +110,25 @@ public partial class QaFindingItemControl : UserControl
             isCustomScriptSupportAvailable);
     }
 
+    /// <summary>
+    /// Commits the final normalized text for this finding and raises at most one
+    /// logical change event.
+    /// </summary>
+    public bool CommitPendingTextEdits()
+    {
+        return CommitPendingTextEditsCore(raiseFindingChanged: true);
+    }
+
+    /// <summary>
+    /// Discards drafts only when the parent has established that this finding no
+    /// longer exists in the synchronized report.
+    /// </summary>
+    public void DiscardPendingTextEdits()
+    {
+        hasPendingCustomScriptNameEdit = false;
+        hasPendingResolutionNotesEdit = false;
+    }
+
     private void ApplyUserResolution(
         QaFindingResolution resolution,
         bool isChecked)
@@ -92,22 +138,38 @@ public partial class QaFindingItemControl : UserControl
             return;
         }
 
+        bool pendingTextChanged =
+            CommitPendingTextEditsCore(raiseFindingChanged: false);
+
         if (!IsResolutionAvailable(boundFinding.Severity, resolution))
         {
             SynchronizeFromFinding(
                 GetRelatedCheckDisplayNameFromLabel(),
                 forceTextRefresh: false);
+
+            if (pendingTextChanged)
+            {
+                OnFindingChanged();
+            }
+
             return;
         }
 
         if (boundFinding.Resolution == resolution)
         {
+            if (pendingTextChanged)
+            {
+                OnFindingChanged();
+            }
+
             return;
         }
 
         boundFinding.Resolution = resolution;
         boundFinding.CustomScriptName = null;
         boundFinding.ResolutionNotes = null;
+        hasPendingCustomScriptNameEdit = false;
+        hasPendingResolutionNotesEdit = false;
 
         SynchronizeFromFinding(
             GetRelatedCheckDisplayNameFromLabel(),
@@ -115,54 +177,80 @@ public partial class QaFindingItemControl : UserControl
         OnFindingChanged();
     }
 
-    private void ApplyCustomScriptName()
+    private void MarkCustomScriptNameEditPending()
     {
         if (isSynchronizing || boundFinding is null)
         {
             return;
         }
 
-        if (!customScriptSupportAvailable
-            || boundFinding.Resolution !=
-                QaFindingResolution.HandledByCustomScript)
-        {
-            return;
-        }
-
-        string? scriptName = TrimToNull(customScriptNameTextBox.Text);
-
-        if (string.Equals(
-                boundFinding.CustomScriptName,
-                scriptName,
-                StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        boundFinding.CustomScriptName = scriptName;
-        OnFindingChanged();
+        hasPendingCustomScriptNameEdit = true;
     }
 
-    private void ApplyResolutionNotes()
+    private void MarkResolutionNotesEditPending()
     {
         if (isSynchronizing || boundFinding is null)
         {
             return;
         }
 
-        string? notes = TrimToNull(resolutionNotesTextBox.Text);
+        hasPendingResolutionNotesEdit = true;
         UpdateExplainedNotesPrompt();
+    }
 
-        if (string.Equals(
-                boundFinding.ResolutionNotes,
-                notes,
-                StringComparison.Ordinal))
+    private bool CommitPendingTextEditsCore(bool raiseFindingChanged)
+    {
+        if (isSynchronizing || boundFinding is null)
         {
-            return;
+            return false;
         }
 
-        boundFinding.ResolutionNotes = notes;
-        OnFindingChanged();
+        bool changed = false;
+
+        if (hasPendingCustomScriptNameEdit)
+        {
+            string? scriptName = customScriptSupportAvailable
+                && boundFinding.Resolution ==
+                    QaFindingResolution.HandledByCustomScript
+                    ? TrimToNull(customScriptNameTextBox.Text)
+                    : null;
+
+            if (!string.Equals(
+                    boundFinding.CustomScriptName,
+                    scriptName,
+                    StringComparison.Ordinal))
+            {
+                boundFinding.CustomScriptName = scriptName;
+                changed = true;
+            }
+
+            hasPendingCustomScriptNameEdit = false;
+        }
+
+        if (hasPendingResolutionNotesEdit)
+        {
+            string? notes = TrimToNull(resolutionNotesTextBox.Text);
+
+            if (!string.Equals(
+                    boundFinding.ResolutionNotes,
+                    notes,
+                    StringComparison.Ordinal))
+            {
+                boundFinding.ResolutionNotes = notes;
+                changed = true;
+            }
+
+            hasPendingResolutionNotesEdit = false;
+        }
+
+        UpdateExplainedNotesPrompt();
+
+        if (changed && raiseFindingChanged)
+        {
+            OnFindingChanged();
+        }
+
+        return changed;
     }
 
     private void NormalizeBoundFinding()
@@ -248,11 +336,13 @@ public partial class QaFindingItemControl : UserControl
             SetOptionalText(
                 customScriptNameTextBox,
                 finding.CustomScriptName,
-                forceTextRefresh);
+                forceTextRefresh,
+                hasPendingCustomScriptNameEdit);
             SetOptionalText(
                 resolutionNotesTextBox,
                 finding.ResolutionNotes,
-                forceTextRefresh);
+                forceTextRefresh,
+                hasPendingResolutionNotesEdit);
 
             AccessibleName = $"{severityText} finding: {finding.Title}";
             AccessibleDescription = finding.Description ?? string.Empty;
@@ -344,8 +434,14 @@ public partial class QaFindingItemControl : UserControl
     private static void SetOptionalText(
         TextBox textBox,
         string? modelValue,
-        bool forceRefresh)
+        bool forceRefresh,
+        bool hasPendingEdit)
     {
+        if (hasPendingEdit && !forceRefresh)
+        {
+            return;
+        }
+
         if (!forceRefresh
             && OptionalTextMatches(textBox.Text, modelValue))
         {

@@ -8,6 +8,10 @@ The implementation operates directly on the approved Phase 2 `QaReport`, `QaStat
 
 Phase 7 remains entirely in memory. It does not parse a file, read a spreadsheet, access a database, run diagnostics or automation, generate or preview a PDF, save a report, choose an output filename, handle overwrites, create Hotel/PMS copies, write a QA Report index entry, or change metadata.
 
+> **Post-Phase-10 pilot correction:** Controlled-pilot testing superseded the original Blank/Broken denominator and threshold rules documented in this phase. The current rules are summarized below and controlled by `Pilot-Correction-Blank-Broken-Statistics.md`. The historical Phase 7 assertion counts remain a record of what was tested at that time; they do not validate the corrected Auto/manual propagation, four threshold families, blank-Notes threshold-only suppression versus nonblank-Notes contextual preservation, resolution-state independence, or corrected PDF/index outcomes.
+
+> **Deferred-text pilot correction:** Free-text statistics explanations, checklist Notes, Created By, Original File Name, and General Notes no longer run model/readiness/findings work per character. They commit on `Validated` or the form's explicit action-boundary batch. Numeric, choice, applicability, and Auto/manual controls remain immediate. The readiness fingerprint still includes every committed text value. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
+
 ## Repository baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -60,7 +64,7 @@ One reusable, vertically scrollable `QaStatisticsControl` provides these groups:
 7. Database Statistics
 8. Report Readiness Summary
 
-Counts use standard `NumericUpDown` controls with `0` through `int.MaxValue` limits. Percentages, derived denominators, signed difference, and absolute difference are read-only. Enum and Boolean choices use fixed drop-down lists. Dynamic blank and broken rows are keyed by stable IDs, reused while applicable, detached and disposed when stale, and arranged in wrapping/scrolling layouts compatible with the existing minimum form size and normal WinForms font scaling.
+Counts use standard `NumericUpDown` controls with `0` through `int.MaxValue` limits. Blank and Broken denominators are editable numeric controls with visible Auto state; percentages, signed difference, and absolute difference remain read-only. Editing one denominator switches only that row to Manual, while selecting Auto immediately restores its current formula. Enum and Boolean choices use fixed drop-down lists. Dynamic Blank and Broken rows are keyed by stable IDs, reused while applicable, detached and disposed when stale, and arranged in wrapping/scrolling layouts compatible with the existing minimum form size and normal WinForms font scaling.
 
 The form action is named `Check Report Readiness`. It is separate from Close and is not a Save, Generate, Export, or PDF action. The read-only summary separates blocking errors from nonblocking workflow warnings and also shows Warning count, Failure/Failed Checks count, handled finding count, calculated status or Not Ready, and Effective Created By.
 
@@ -91,11 +95,11 @@ email addresses, payment information, credentials, or reservation-level data.
 
 The Phase 2 characteristics do not contain a separate Source/Rate/Market existence flag, so that catalog concept is structurally applicable. Average Rate is structurally available for every approved monetary scenario. Stay Value is available for `TwoMonetaryColumns` and `MoreThanTwoMonetaryColumns` only.
 
-Changing name mode removes the inapplicable name rows. Full Name mode also clears the non-list multiword First/Last state. Removing Stay Value applicability removes its list rows, clears unusual/high Stay Value state and explanations, and removes its managed findings. Rejected-record applicability continues through the existing Phase 5 characteristic and checklist applicability path, with the database statistic count as the authoritative input.
+Changing name mode removes the inapplicable name rows. Full Name mode also clears the non-list multiword First/Last state. Removing Stay Value applicability removes its list rows, clears unusual/high Stay Value state and explanations, and removes its managed findings. A row that later becomes applicable is created fresh in Auto mode from current values; stale hidden denominator overrides are not restored. Rejected-record applicability continues through the existing Phase 5 characteristic and checklist applicability path, with the database statistic count as the authoritative input.
 
 ## Calculation and denominator behavior
 
-`QaStatisticsCalculationService` reconciles the approved statistics objects and centralizes derived values. It reuses existing applicable row objects, removes non-applicable rows, maintains catalog order, and calculates with decimal arithmetic:
+`QaStatisticsCalculationService` reconciles the approved statistics objects and centralizes derived values. It reuses existing applicable row objects, removes non-applicable rows, maintains catalog order, applies automatic propagation only to rows still in Auto mode, and calculates with decimal arithmetic:
 
 ```text
 Percentage = denominator <= 0
@@ -105,13 +109,21 @@ Percentage = denominator <= 0
 
 Percentages remain the approved non-nullable `decimal` values on a 0–100 scale and display with two decimal places. Zero denominators produce `0.00%`; no floating-point `NaN` or infinity is possible. Validation, rather than silent clamping, rejects negative values and numerators above denominators.
 
-Each broken-data denominator is derived and displayed read-only from its matching blank row:
+Each automatic Blank denominator follows File Information:
+
+```text
+Total Applicable Rows = Total Data Rows
+```
+
+`Total Data Rows` is entered as the number of rows containing data, excluding headers and any preamble. Headers Present, Useful Headers, and Data Start Row describe the file layout and do not cause a second subtraction. Thus, a file with 120 occupied physical rows, a header on row 1, and data beginning on row 2 has Total Data Rows `119` and an Auto Blank denominator of `119`.
+
+Each automatic Broken denominator follows its matching Blank row:
 
 ```text
 Applicable Nonblank Count = Total Applicable Rows - Blank Count
 ```
 
-The same derived denominator is used for multiword First Name, multiword Last Name, unusual Average Rate, unusual Stay Value, and high Stay Value percentages. Validation requires the corresponding blank row and checks the derived relationship.
+The user may override either denominator independently. A Manual Blank denominator remains the source population for its still-automatic Broken row. A Manual Broken denominator may represent a smaller inspected populated subset but cannot exceed the matching Blank-derived nonblank population. The same Blank-derived denominator is used for multiword First Name, multiword Last Name, unusual Average Rate, unusual Stay Value, and high Stay Value percentages. Validation requires the corresponding Blank row and checks Auto formulas, Manual bounds, and displayed percentages without silently clamping counts.
 
 The database difference remains signed in the approved model:
 
@@ -125,23 +137,37 @@ The warning condition and second read-only UI value use its absolute magnitude. 
 
 Every applicable catalog field has exactly one approved `QaBlankValueStatistic` and one `QaBrokenDataStatistic`. Display text is refreshed from the catalog, but identity is always the stable field ID.
 
-A calculated blank percentage strictly greater than 50 creates one Warning:
+A positive Blank percentage through 50%, inclusive, creates one Warning:
 
 ```text
 WARN:STAT:BLANK:<FieldId>
 ```
 
-Exactly 50% does not warn. The description includes display name, blank count, applicable-row denominator, and percentage. Blank findings use Warning severity and Statistic source.
+Above 50% creates one Failure:
 
-For positive broken counts with a related checklist ID, the related check must be Fail. The statistics layer does not create another Failure, including when several date fields map to the single date-format check. Pass, Not Evaluated, or N/A in an applicable mapped case is a blocking validation contradiction.
+```text
+FAIL:STAT:BLANK:<FieldId>
+```
 
-For positive broken counts without a dedicated related check, the synchronizer creates one Failure:
+Zero creates no Blank finding. Exactly 50% is a Warning. The description includes display name, Blank count, displayed applicable-row denominator, and percentage. Blank findings use Statistic source and never force required-field-presence or populated-value-validity checks to Fail.
+
+A positive Broken percentage through 50%, inclusive, creates one Warning:
+
+```text
+WARN:STAT:BROKEN:<FieldId>
+```
+
+Above 50% creates one Failure:
 
 ```text
 FAIL:STAT:BROKEN:<FieldId>
 ```
 
-It includes the field, count, derived nonblank denominator, percentage, and optional non-sensitive explanation. It uses Failure severity, Statistic source, and Active resolution when newly created. Failure findings can be handled by custom script under the existing Phase 6 support rules but can never be Explained and Accepted.
+Zero creates no Broken finding. Exactly 50% is a Warning. Each finding includes the field, count, displayed nonblank denominator, percentage, and optional non-sensitive explanation. It uses Statistic source and Active resolution when newly created. Failure findings can be handled by custom script under the existing Phase 6 support rules but can never be Explained and Accepted.
+
+At or below 50%, a mapped populated-value-validity check may remain Pass. Above 50%, the related check must be Fail or readiness reports a contradiction. The canonical Failure remains `FAIL:STAT:BROKEN:<FieldId>`. Synchronization suppresses the corresponding generic `FAIL:<ChecklistId>` only when the current failing checklist result has blank Notes after trimming, identifying the threshold-only path. Nonblank checklist Notes document a separate contextual defect, so both the canonical statistics Failure and contextual checklist Failure remain. Resolution state alone is not a causal signal and does not control this choice. Several date fields may still map to the one date-format checklist row, but each affected field retains its own canonical statistics identity.
+
+Blank and Broken findings remain independent. For example, Blank `20/100` and Broken `10/80` produce 20.00% and 12.50% and may produce two Warnings without a Failure.
 
 ## Name and File Month statistics
 
@@ -216,11 +242,11 @@ When a managed condition ends, its finding is removed without a cache or tombsto
 - `EffectiveCreatedBy`
 - Warning, Failure, and handled finding counts
 
-It validates canonical Hotel ID/Name/PMS, File Month, QA Date, file-characteristic enum values, File Information, exact checklist-result coverage/applicability/status/source, required notes, complete statistics coverage, numeric relationships, calculated percentages, derived denominators, mapped checklist consistency, File Month consistency, monetary consistency, database consistency, deterministic finding coverage, finding enums and related IDs, resolution validity, stale managed findings, duplicate IDs, and explanation requirements.
+It validates canonical Hotel ID/Name/PMS, File Month, QA Date, file-characteristic enum values, File Information, exact checklist-result coverage/applicability/status/source, required notes, complete statistics coverage, numeric relationships, calculated percentages, Auto formulas, Manual denominator bounds, mapped checklist consistency above 50%, File Month consistency, monetary consistency, database consistency, deterministic finding coverage, finding enums and related IDs, resolution validity, stale managed findings, duplicate IDs, and explanation requirements.
 
-Zero Total Data Rows is permitted only when a failed checklist result or current Failure coherently documents the empty/invalid file. With positive data rows, applicable-row denominators normally must be entered and compatible with Total Data Rows. A zero denominator is accepted only for a field whose matching required-field presence check is Fail, documenting that the field itself is absent.
+Zero Total Data Rows is permitted only when a failed checklist result or current Failure coherently documents the empty/invalid file. With positive data rows, Blank applicable-row denominators normally must be entered and compatible with Total Data Rows. A zero Blank denominator is accepted only for a field whose matching required-field presence check is Fail, documenting that the field itself is absent. A Broken denominator may also be zero when the matching Blank row leaves a genuine zero nonblank population; a positive Broken count with that denominator remains invalid.
 
-Workflow completion problems remain structured blocking errors; they do not become `QaFinding` objects. This includes missing Hotel selection, invalid File Month, incomplete checklist items, numeric errors, and checklist/statistics contradictions.
+Workflow completion problems remain structured blocking errors; they do not become `QaFinding` objects. This includes missing Hotel selection, invalid File Month, incomplete checklist items, impossible Auto or Manual denominators, count/denominator errors, unsynchronized percentages, and greater-than-50% mapped Broken/checklist contradictions. Positive Blank or Broken counts do not block merely because they are positive; ready Warning and ready Failure reports are both supported.
 
 ## Created By workflow
 
@@ -274,6 +300,8 @@ The same command was run repeatedly against the integrated Phase 7 implementatio
 
 ### Directly executed pure-component tests
 
+> **Superseded scope note:** The results below are retained as historical Phase 7 evidence. The original threshold and read-only-denominator assertions are not accepted as evidence for the final correction. Current evidence is tracked separately: semantic tests passed 7/7 with header exclusion, First/Full/Last Name, and resolution-noncausality coverage; STA geometry passed 7/7 at actual `DeviceDpi=120`; save/PDF/index, blocked-save, overwrite, and protected V1 regressions passed. Real 100% and 150% scaling remain Not Run. See `V2-Production-Readiness.md`.
+
 A disposable initial harness directly exercised statistics applicability, preservation/removal of list-row objects, percentage and denominator arithmetic, signed/absolute differences, all status branches, complete Pass readiness, missing Created By fallback without model mutation, and zero-row blocking. It completed 24 assertions successfully. Its project, build output, and temporary files were removed.
 
 The final disposable `net10.0-windows` harness completed:
@@ -284,9 +312,9 @@ RESULT assertions=141 passed=141 failed=0 skipped=0
 
 Of those, 122 assertions directly exercised definitions and pure calculation, applicability, synchronized finding, lifecycle, validation, and status services. Coverage included all requested threshold and recurrence boundaries; mapped and unmapped broken data; multiword and Full Name transitions; File Month equality/checklist consistency; unusual and high monetary behavior; `+9`, `+10`, and `-10` database differences; rejected-record applicability and Warning/Failure suppression; missing DB values; Created By fallback/no mutation; every status branch; Not Evaluated blocking; and duplicate, stale, and invalid-denominator validation.
 
-The remaining 19 assertions used an STA offscreen production `QaReportForm`. They verified the five tabs and their order, statistics scrolling/minimum-size structure, privacy reminder content, `int` numeric limits, dynamic row counts, read-only broken denominators, readiness-button navigation to the summary, ready Pass/status display, statistic-edit invalidation with the required stale text, revalidation, and Close with no storage write. The storage probe remained absent.
+The remaining 19 assertions used an STA offscreen production `QaReportForm`. They verified the five tabs and their order, statistics scrolling/minimum-size structure, privacy reminder content, `int` numeric limits, dynamic row counts, the then-current read-only Broken denominators, readiness-button navigation to the summary, ready Pass/status display, statistic-edit invalidation with the required stale text, revalidation, and Close with no storage write. The storage probe remained absent. The read-only-denominator assertion is specifically superseded and must not be treated as current expected behavior.
 
-Both product and harness builds completed with 0 warnings and 0 errors. The harness project, `bin`/`obj`, storage probe, and process were removed. No permanent test project or test package is part of the repository.
+Both historical Phase 7 product and harness builds completed with 0 warnings and 0 errors. That harness project, `bin`/`obj`, storage probe, and process were removed; no permanent test project or test package was part of the Phase 7 checkpoint. The controlled-pilot correction adds the permanent focused project `tests/DocumentationLoggingDashboard.GeometryTests`, with semantic, geometry/interaction, and synthetic save/PDF/index files. Its completed and still-open results are recorded in `Pilot-Correction-Blank-Broken-Statistics.md`; this historical section does not approve the correction.
 
 ### Human-visible GUI testing
 
@@ -300,8 +328,8 @@ Manual desktop checklist:
 4. Toggle Separate Name and Full Name modes; confirm the blank/broken name rows and informational multiword group switch and clear as documented.
 5. Toggle one versus two/more monetary columns; confirm all Stay Value rows, explanations, and findings hide/clear or reappear correctly.
 6. Enter representative large `int` counts and verify calculated fields remain read-only and percentages show two decimal places.
-7. Exercise exactly 50% and greater-than-50% blank values and confirm Findings updates without duplicates.
-8. Exercise mapped and unmapped broken values and confirm Warnings remain separate from Failed Checks.
+7. Exercise `0`, `1`, `50`, and `51` out of `100` for both Blank and Broken values; confirm exactly 50% is Warning and 51% is Failure.
+8. Exercise mapped and unmapped Broken values, including blank-Notes threshold-only suppression, nonblank-Notes preservation of both contextual and statistics Failures, resolution-state independence, and Warning/Failed Checks separation.
 9. Verify visible privacy reminders are adjacent to Broken Data, Monetary, and Database free-text areas.
 10. Enter rejected-record context from Statistics, switch to DB QA, and confirm the same checklist notes are visible; edit there and confirm Statistics reflects the update.
 11. Check readiness for Pass, Pass with Warnings, Fail, and an incomplete report; verify summary sections and status wording.
@@ -323,7 +351,7 @@ Human-visible V1 Preview/Submit, folder selection/reset, shell-opening actions, 
 - Stay Value applicability is represented by the existing monetary-column scenario: two or more monetary fields.
 - Source / Rate / Market is structurally applicable because no existing characteristic records its absence.
 - Average Rate is structurally applicable in all approved monetary scenarios.
-- Broken denominators are derived and read-only in the UI, while validation catches impossible inputs rather than masking them.
+- Blank and Broken denominators are automatic by default, editable per row, and return to their current formula through the visible Auto control; validation catches impossible inputs rather than masking them.
 - Row-difference context uses the managed finding's `ResolutionNotes`; rejected-record context uses the related checklist result's `Notes`. These are existing approved properties and avoid a replacement DTO or Phase 2 contract change.
 - Rejected Record Count is authoritative for the pre-existing rejected-record characteristic. The older characteristic radio group is retained for layout/history but disabled and clearly labelled as statistics-driven.
 - Useful Headers remains informational and creates no finding.

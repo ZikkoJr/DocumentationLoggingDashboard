@@ -943,18 +943,18 @@ internal sealed class QaPdfDocumentBuilder
     private static (int Category, int Primary, int Secondary) GetFindingOrder(
         QaFinding finding)
     {
-        if (finding.RelatedCheckId is string relatedId
-            && ChecklistOrder.TryGetValue(relatedId, out int checklistOrder))
-        {
-            return (0, checklistOrder, 0);
-        }
-
         if (TryGetStatisticFindingOrder(
                 finding.FindingId,
                 out int group,
                 out int fieldOrder))
         {
             return (1, group, fieldOrder);
+        }
+
+        if (finding.RelatedCheckId is string relatedId
+            && ChecklistOrder.TryGetValue(relatedId, out int checklistOrder))
+        {
+            return (0, checklistOrder, 0);
         }
 
         return finding.Source == QaFindingSource.Manual
@@ -967,22 +967,32 @@ internal sealed class QaPdfDocumentBuilder
         out int group,
         out int fieldOrder)
     {
-        const string blankPrefix = "WARN:STAT:BLANK:";
-        const string brokenPrefix = "FAIL:STAT:BROKEN:";
+        const string blankWarningPrefix = "WARN:STAT:BLANK:";
+        const string blankFailurePrefix = "FAIL:STAT:BLANK:";
+        const string brokenWarningPrefix = "WARN:STAT:BROKEN:";
+        const string brokenFailurePrefix = "FAIL:STAT:BROKEN:";
 
-        if (findingId.StartsWith(blankPrefix, StringComparison.Ordinal))
+        string? blankFieldId = GetStatisticFieldId(
+            findingId,
+            blankWarningPrefix,
+            blankFailurePrefix);
+        if (blankFieldId is not null)
         {
             group = 0;
             return StatisticOrder.TryGetValue(
-                findingId[blankPrefix.Length..],
+                blankFieldId,
                 out fieldOrder);
         }
 
-        if (findingId.StartsWith(brokenPrefix, StringComparison.Ordinal))
+        string? brokenFieldId = GetStatisticFieldId(
+            findingId,
+            brokenWarningPrefix,
+            brokenFailurePrefix);
+        if (brokenFieldId is not null)
         {
             group = 1;
             return StatisticOrder.TryGetValue(
-                findingId[brokenPrefix.Length..],
+                brokenFieldId,
                 out fieldOrder);
         }
 
@@ -997,6 +1007,21 @@ internal sealed class QaPdfDocumentBuilder
         };
         fieldOrder = 0;
         return group >= 0;
+    }
+
+    private static string? GetStatisticFieldId(
+        string findingId,
+        string warningPrefix,
+        string failurePrefix)
+    {
+        if (findingId.StartsWith(warningPrefix, StringComparison.Ordinal))
+        {
+            return findingId[warningPrefix.Length..];
+        }
+
+        return findingId.StartsWith(failurePrefix, StringComparison.Ordinal)
+            ? findingId[failurePrefix.Length..]
+            : null;
     }
 
     private static string? GetRelatedChecklistDisplayName(string? checkId)

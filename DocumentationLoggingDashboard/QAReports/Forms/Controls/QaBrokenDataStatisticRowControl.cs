@@ -10,11 +10,13 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
 {
     private readonly Label fieldNameLabel;
     private readonly NumericUpDown brokenCountNumericUpDown;
-    private readonly TextBox nonblankCountTextBox;
+    private readonly NumericUpDown nonblankCountNumericUpDown;
+    private readonly CheckBox automaticNonblankCountCheckBox;
     private readonly TextBox percentageTextBox;
     private readonly TextBox explanationTextBox;
 
     private QaBrokenDataStatistic? boundStatistic;
+    private bool hasPendingExplanationEdit;
     private bool isRefreshing;
 
     public QaBrokenDataStatisticRowControl()
@@ -36,8 +38,10 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
         };
 
         brokenCountNumericUpDown = CreateCountInput("Broken value count");
-        nonblankCountTextBox =
-            CreateReadOnlyValue("Derived applicable nonblank values");
+        nonblankCountNumericUpDown =
+            CreateDenominatorInput("Derived applicable nonblank values");
+        automaticNonblankCountCheckBox = CreateAutomaticCheckBox(
+            "Calculate applicable nonblank values automatically");
         percentageTextBox = CreateReadOnlyValue("Broken-data percentage");
         explanationTextBox = new TextBox
         {
@@ -65,7 +69,9 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
             brokenCountNumericUpDown));
         metricsPanel.Controls.Add(CreateMetricPanel(
             "Derived nonblank values",
-            nonblankCountTextBox));
+            CreateDenominatorEditor(
+                nonblankCountNumericUpDown,
+                automaticNonblankCountCheckBox)));
         metricsPanel.Controls.Add(CreateMetricPanel(
             "Broken-data percentage",
             percentageTextBox));
@@ -100,7 +106,14 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
         Controls.Add(mainLayoutPanel);
 
         brokenCountNumericUpDown.ValueChanged += (_, _) => ApplyUserValues();
-        explanationTextBox.TextChanged += (_, _) => ApplyUserValues();
+        nonblankCountNumericUpDown.ValueChanged += (_, _) =>
+            ApplyManualDenominatorValue();
+        automaticNonblankCountCheckBox.CheckedChanged += (_, _) =>
+            ApplyUserValues();
+        explanationTextBox.TextChanged += (_, _) =>
+            MarkExplanationEditPending();
+        explanationTextBox.Validated += (_, _) =>
+            CommitPendingTextEdits();
     }
 
     public string FieldId => boundStatistic?.FieldId ?? string.Empty;
@@ -118,7 +131,27 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
                 nameof(statistic));
         }
 
+        bool bindingChanged = !ReferenceEquals(boundStatistic, statistic);
+
+        if (bindingChanged && boundStatistic is not null)
+        {
+            bool sameFieldId = boundStatistic.FieldId.Equals(
+                statistic.FieldId,
+                StringComparison.Ordinal);
+            _ = CommitPendingTextEditsCore(raiseStatisticChanged: false);
+
+            if (sameFieldId)
+            {
+                statistic.Explanation = boundStatistic.Explanation;
+            }
+        }
+
         boundStatistic = statistic;
+        if (bindingChanged)
+        {
+            hasPendingExplanationEdit = false;
+        }
+
         RefreshFromStatistic();
     }
 
@@ -134,19 +167,27 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
             AccessibleName = $"Broken data for {statistic.DisplayName}";
             brokenCountNumericUpDown.AccessibleName =
                 $"Broken value count for {statistic.DisplayName}";
-            nonblankCountTextBox.AccessibleName =
+            nonblankCountNumericUpDown.AccessibleName =
                 $"Derived applicable nonblank values for {statistic.DisplayName}";
+            automaticNonblankCountCheckBox.AccessibleName =
+                $"Calculate applicable nonblank values automatically for {statistic.DisplayName}";
             percentageTextBox.AccessibleName =
                 $"Calculated broken-data percentage for {statistic.DisplayName}";
             explanationTextBox.AccessibleName =
                 $"Broken-data explanation for {statistic.DisplayName}";
 
             SetCountValue(brokenCountNumericUpDown, statistic.BrokenValueCount);
-            nonblankCountTextBox.Text =
-                statistic.TotalApplicableNonblankValues.ToString("N0");
+            SetDenominatorValue(
+                nonblankCountNumericUpDown,
+                statistic.TotalApplicableNonblankValues);
+            automaticNonblankCountCheckBox.Checked =
+                statistic.UseAutomaticTotalApplicableNonblankValues;
             percentageTextBox.Text = FormatPercentage(
                 statistic.BrokenDataPercentage);
-            SetOptionalText(explanationTextBox, statistic.Explanation);
+            if (!hasPendingExplanationEdit)
+            {
+                SetOptionalText(explanationTextBox, statistic.Explanation);
+            }
         }
         finally
         {
@@ -159,13 +200,36 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
         QaBrokenDataStatistic statistic = GetBoundStatistic();
         statistic.BrokenValueCount =
             decimal.ToInt32(brokenCountNumericUpDown.Value);
+        statistic.TotalApplicableNonblankValues =
+            decimal.ToInt32(nonblankCountNumericUpDown.Value);
+        statistic.UseAutomaticTotalApplicableNonblankValues =
+            automaticNonblankCountCheckBox.Checked;
         statistic.BrokenDataPercentage =
             QaStatisticsCalculationService.CalculatePercentage(
                 statistic.BrokenValueCount,
                 statistic.TotalApplicableNonblankValues);
-        statistic.Explanation = TrimToNull(explanationTextBox.Text);
+        _ = CommitPendingTextEditsCore(raiseStatisticChanged: false);
         percentageTextBox.Text = FormatPercentage(
             statistic.BrokenDataPercentage);
+    }
+
+    /// <summary>
+    /// Commits the final normalized explanation and raises at most one logical
+    /// statistic change event.
+    /// </summary>
+    public bool CommitPendingTextEdits()
+    {
+        return CommitPendingTextEditsCore(raiseStatisticChanged: true);
+    }
+
+    internal bool CommitPendingTextEditsWithoutNotification()
+    {
+        return CommitPendingTextEditsCore(raiseStatisticChanged: false);
+    }
+
+    public void DiscardPendingTextEdits()
+    {
+        hasPendingExplanationEdit = false;
     }
 
     private void ApplyUserValues()
@@ -177,6 +241,65 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
 
         CommitCurrentValues();
         StatisticChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void MarkExplanationEditPending()
+    {
+        if (!isRefreshing && boundStatistic is not null)
+        {
+            hasPendingExplanationEdit = true;
+        }
+    }
+
+    private bool CommitPendingTextEditsCore(bool raiseStatisticChanged)
+    {
+        if (isRefreshing
+            || !hasPendingExplanationEdit
+            || boundStatistic is null)
+        {
+            return false;
+        }
+
+        string? explanation = TrimToNull(explanationTextBox.Text);
+        bool changed = !string.Equals(
+            boundStatistic.Explanation,
+            explanation,
+            StringComparison.Ordinal);
+
+        if (changed)
+        {
+            boundStatistic.Explanation = explanation;
+        }
+
+        hasPendingExplanationEdit = false;
+
+        if (changed && raiseStatisticChanged)
+        {
+            StatisticChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return changed;
+    }
+
+    private void ApplyManualDenominatorValue()
+    {
+        if (isRefreshing || boundStatistic is null)
+        {
+            return;
+        }
+
+        isRefreshing = true;
+
+        try
+        {
+            automaticNonblankCountCheckBox.Checked = false;
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
+
+        ApplyUserValues();
     }
 
     private QaBrokenDataStatistic GetBoundStatistic()
@@ -210,6 +333,51 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
         };
     }
 
+    private static NumericUpDown CreateDenominatorInput(string accessibleName)
+    {
+        return new NumericUpDown
+        {
+            AccessibleName = accessibleName,
+            Maximum = int.MaxValue,
+            Minimum = int.MinValue,
+            Size = new Size(132, 23),
+            ThousandsSeparator = true
+        };
+    }
+
+    private static CheckBox CreateAutomaticCheckBox(string accessibleName)
+    {
+        return new CheckBox
+        {
+            AccessibleDescription =
+                "Clear Auto to keep a manual denominator. Select Auto to calculate from the matching Blank statistic.",
+            AccessibleName = accessibleName,
+            AutoSize = true,
+            Checked = true,
+            Margin = new Padding(7, 3, 0, 0),
+            Name = "automaticNonblankCountCheckBox",
+            Text = "Auto"
+        };
+    }
+
+    private static Control CreateDenominatorEditor(
+        NumericUpDown valueControl,
+        CheckBox automaticCheckBox)
+    {
+        FlowLayoutPanel panel = new()
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = Padding.Empty,
+            WrapContents = false
+        };
+        valueControl.Margin = Padding.Empty;
+        panel.Controls.Add(valueControl);
+        panel.Controls.Add(automaticCheckBox);
+        return panel;
+    }
+
     private static Control CreateMetricPanel(string labelText, Control valueControl)
     {
         Label label = new()
@@ -239,6 +407,11 @@ public sealed class QaBrokenDataStatisticRowControl : UserControl
     private static void SetCountValue(NumericUpDown control, int value)
     {
         control.Value = Math.Clamp(value, 0, int.MaxValue);
+    }
+
+    private static void SetDenominatorValue(NumericUpDown control, int value)
+    {
+        control.Value = Math.Clamp(value, control.Minimum, control.Maximum);
     }
 
     private static void SetOptionalText(TextBox textBox, string? value)

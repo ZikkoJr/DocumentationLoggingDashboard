@@ -8,6 +8,10 @@ The renderer does not save a file, select a path or final filename, show UI, acc
 
 Phase 9 must call the renderer exactly once for a ready report and reuse the same returned byte array for both destination writes. It must not render one PDF independently for each destination.
 
+> **Post-Phase-10 pilot correction:** The renderer remains a consumer of the synchronized model and calculated status. It now recognizes all four Blank/Broken threshold finding families for deterministic ordering. No PDF section or table format was added. Save/PDF/index tests passed 7/7 in Debug and Release, and representative both-Warnings, mapped-Failure, and handled-mapped-Failure PDFs were rendered and visually reviewed without clipping, overlap, or guest-level data. Debug and Release semantic suites passed 7/7 and cover blank- versus nonblank-Notes behavior, but a direct permanent PDF-order assertion and a rendered nonblank-Notes two-Failure variant remain coverage gaps. Exact current evidence and open gates are recorded in `Pilot-Correction-Blank-Broken-Statistics.md`; historical Phase 8 PDFs remain bounded to the renderer/pagination shapes they exercised.
+
+> **Deferred-text boundary:** The final P2 correction flushes every pending report, checklist, finding, and statistics text draft before readiness and save. Five focused paired-save cases confirmed that the final character reached the PDF, the Hotel/PMS copies remained byte-identical, and rendered long text remained readable. No PDF format changed. Exact markers, hashes, and final evidence are in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
+
 ## Repository baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -124,21 +128,21 @@ Original filename display is deliberately non-storage-oriented. Leading/trailing
 
 Information and Statistics contains:
 
-- File Information: Total Data Rows, Headers Present, Useful Headers, and Data Start Row.
+- File Information: Total Data Rows, Headers Present, Useful Headers, and Data Start Row. Total Data Rows is the entered data-only count and excludes headers/preamble; the descriptive header/data-start fields do not cause the renderer or statistics services to subtract again.
 - Warning Summary: Warning-severity findings only, with total count and ordered title/resolution rows; Failures are never folded into this summary.
-- Blank Value Statistics and Broken Data Statistics as separate catalog-ordered tables with independent counts, denominators, percentages, and broken explanations.
+- Blank Value Statistics and Broken Data Statistics as separate catalog-ordered tables with independent counts, the final displayed Auto-or-Manual denominators, percentages, and Broken explanations. Auto/manual mode itself does not add a new PDF column.
 - Name Statistics only for Separate First/Last Name mode.
 - File Month Statistics with valid/inside/outside counts and stored percentages.
 - Monetary Statistics with applicable Average Rate, Stay Value, and high-value details.
 - Database Statistics with imported count and absolute raw/DB difference, plus a DB Issues table only when rejected or missing-required-value counts are positive. Existing checklist/finding context is displayed rather than inventing new conclusions.
 
-Percentages use the stored Phase 7 values and render as `0.00%`; the PDF layer does not recalculate them.
+Percentages use the stored corrected values and render as `0.00%`; the PDF layer does not recalculate them. Readiness and its fingerprint prove that counts, displayed denominators, percentages, finding IDs, severities, and modes were synchronized before rendering.
 
 Raw File QA and DB QA iterate the actual immutable `QaChecklistCatalog` in catalog and section order. The input gate requires exactly one result for every definition. Pass and Fail render directly, Not Applicable renders as `N/A` with an explanatory detail, and Not Evaluated is refused. Table heading rows repeat after page breaks.
 
-Warnings and Failed Checks are filtered strictly by original severity, then deterministically ordered. Resolution never changes placement: handled Warnings remain under Warnings, while handled Failures remain under Failed Checks even when the overall status is Pass with Warnings. Finding blocks show severity/resolution, title, description, related check where available, source, resolution, optional script name, and optional resolution notes.
+Warnings and Failed Checks are filtered strictly by original severity, then deterministically ordered. Corrected Blank/Broken results greater than 0% through 50%, inclusive, appear under Warnings; results above 50% appear under Failed Checks. Resolution never changes placement: handled Warnings remain under Warnings, while handled Failures remain under Failed Checks even when the overall status is Pass with Warnings. Finding blocks show severity/resolution, title, description, related check where available, source, resolution, optional script name, and optional resolution notes.
 
-Finding order is catalog-related findings first in checklist order, then statistics findings by stable statistic group/field order, then other generated findings, then manual findings, with stable finding ID tie-breaking.
+Finding order is catalog-related findings first in checklist order, then statistics findings by stable statistic group/field order, then other generated findings, then manual findings, with stable finding ID tie-breaking. The statistic-order path recognizes `WARN` and `FAIL` variants for both Blank and Broken families. For a mapped greater-than-50% Broken condition, blank Notes on the current failing checklist result identify the threshold-only path, so the PDF renders the canonical statistics Failure without a generic checklist finding. Nonblank checklist Notes document a separate contextual defect, so the PDF renders both Failures. Resolution state alone does not determine which path is rendered.
 
 General Notes are added as literal plain text only. Markup-looking input is not interpreted. CR/LF variants are normalized only for display. Long unbroken runs are split at a stable 42-character display boundary to prevent clipping.
 
@@ -224,6 +228,8 @@ It used the actual production models, catalogs, calculation/synchronization/vali
 PASS assertions=110
 PASS extracted-pdf checks=191
 ```
+
+> **Historical-evidence boundary:** These counts and the PDF/page results below predate the controlled-pilot Blank/Broken correction. They remain an accurate record of that Phase 8 run, including general section separation and pagination. The later correction record now contains the separate seven-case synthetic evidence and representative rendered review; those results do not retroactively change this historical assertion count or satisfy the still-open direct PDF-order/nonblank-Notes rendered variant gaps.
 
 The scenarios covered Pass; three Warning resolution states; active Failure plus a separate Warning; handled Failure; blank Created By; present, absent, long, Windows-path, Unix-path, mixed-path, separator-only, and trailing-separator original filenames; full statistics with and without DB Issues; N/A checklist output; long notes; special characters; 18 additional findings; and long pagination.
 

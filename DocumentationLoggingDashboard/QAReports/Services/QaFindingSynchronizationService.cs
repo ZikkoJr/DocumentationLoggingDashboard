@@ -181,6 +181,10 @@ public sealed class QaFindingSynchronizationService
                 QaChecklistIds.Database.RejectedRecordsAccountedFor,
                 out QaCheckResult? rejectedRecordsResult)
             && rejectedRecordsResult.Status == QaCheckStatus.Pass;
+        HashSet<string> thresholdCanonicalChecklistFailureIds =
+            GetBrokenThresholdFailureRelatedCheckIds(
+                statistics,
+                characteristics);
 
         foreach (QaCheckDefinition definition in checklistDefinitions)
         {
@@ -188,9 +192,15 @@ public sealed class QaFindingSynchronizationService
 
             if (result.Status == QaCheckStatus.Fail)
             {
-                AddExpected(
-                    expectedById,
-                    CreateChecklistFailure(definition, result));
+                if (!ShouldSuppressChecklistFailureForThreshold(
+                        result,
+                        thresholdCanonicalChecklistFailureIds))
+                {
+                    AddExpected(
+                        expectedById,
+                        CreateChecklistFailure(definition, result));
+                }
+
                 continue;
             }
 
@@ -241,6 +251,14 @@ public sealed class QaFindingSynchronizationService
             rejectedRecordsStatisticWarningExpected);
 
         return expectedById;
+    }
+
+    private static bool ShouldSuppressChecklistFailureForThreshold(
+        QaCheckResult result,
+        ISet<string> thresholdCanonicalChecklistFailureIds)
+    {
+        return thresholdCanonicalChecklistFailureIds.Contains(result.CheckId)
+            && TrimToNull(result.Notes) is null;
     }
 
     private static QaFinding CreateChecklistFailure(
@@ -327,11 +345,11 @@ public sealed class QaFindingSynchronizationService
         QaFileCharacteristics characteristics,
         bool rejectedRecordsStatisticWarningExpected)
     {
-        AddExpectedBlankStatisticWarnings(
+        AddExpectedBlankStatisticFindings(
             expectedById,
             statistics,
             characteristics);
-        AddExpectedBrokenStatisticFailures(
+        AddExpectedBrokenStatisticFindings(
             expectedById,
             statistics,
             characteristics);
@@ -386,7 +404,7 @@ public sealed class QaFindingSynchronizationService
             rejectedRecordsStatisticWarningExpected);
     }
 
-    private void AddExpectedBlankStatisticWarnings(
+    private void AddExpectedBlankStatisticFindings(
         IDictionary<string, QaFinding> expectedById,
         QaStatistics statistics,
         QaFileCharacteristics characteristics)
@@ -410,20 +428,25 @@ public sealed class QaFindingSynchronizationService
                 QaStatisticsCalculationService.CalculatePercentage(
                     statistic.BlankCount,
                     statistic.TotalApplicableRows);
+            QaFindingSeverity? severity =
+                QaStatisticsCalculationService.ClassifyThreshold(
+                    statistic.BlankCount,
+                    statistic.TotalApplicableRows);
 
-            if (percentage > 50m)
+            if (severity is not null)
             {
                 AddExpected(
                     expectedById,
-                    CreateBlankStatisticWarning(
+                    CreateBlankStatisticFinding(
                         definition,
                         statistic,
-                        percentage));
+                        percentage,
+                        severity.Value));
             }
         }
     }
 
-    private void AddExpectedBrokenStatisticFailures(
+    private void AddExpectedBrokenStatisticFindings(
         IDictionary<string, QaFinding> expectedById,
         QaStatistics statistics,
         QaFileCharacteristics characteristics)
@@ -431,7 +454,6 @@ public sealed class QaFindingSynchronizationService
         foreach (QaBrokenDataStatistic? statistic in statistics.BrokenData)
         {
             if (statistic is null
-                || statistic.BrokenValueCount <= 0
                 || string.IsNullOrWhiteSpace(statistic.FieldId)
                 || !statisticFieldDefinitionsById.TryGetValue(
                     statistic.FieldId,
@@ -439,8 +461,7 @@ public sealed class QaFindingSynchronizationService
                 || !definition.SupportsBrokenDataStatistics
                 || !QaStatisticFieldCatalog.IsApplicable(
                     definition,
-                    characteristics)
-                || !string.IsNullOrWhiteSpace(definition.RelatedChecklistId))
+                    characteristics))
             {
                 continue;
             }
@@ -449,13 +470,54 @@ public sealed class QaFindingSynchronizationService
                 QaStatisticsCalculationService.CalculatePercentage(
                     statistic.BrokenValueCount,
                     statistic.TotalApplicableNonblankValues);
-            AddExpected(
-                expectedById,
-                CreateBrokenStatisticFailure(
-                    definition,
-                    statistic,
-                    percentage));
+            QaFindingSeverity? severity =
+                QaStatisticsCalculationService.ClassifyThreshold(
+                    statistic.BrokenValueCount,
+                    statistic.TotalApplicableNonblankValues);
+
+            if (severity is not null)
+            {
+                AddExpected(
+                    expectedById,
+                    CreateBrokenStatisticFinding(
+                        definition,
+                        statistic,
+                        percentage,
+                        severity.Value));
+            }
         }
+    }
+
+    private HashSet<string> GetBrokenThresholdFailureRelatedCheckIds(
+        QaStatistics statistics,
+        QaFileCharacteristics characteristics)
+    {
+        HashSet<string> checkIds = new(StringComparer.Ordinal);
+
+        foreach (QaBrokenDataStatistic? statistic in statistics.BrokenData)
+        {
+            if (statistic is null
+                || string.IsNullOrWhiteSpace(statistic.FieldId)
+                || !statisticFieldDefinitionsById.TryGetValue(
+                    statistic.FieldId,
+                    out QaStatisticFieldDefinition? definition)
+                || string.IsNullOrWhiteSpace(definition.RelatedChecklistId)
+                || !definition.SupportsBrokenDataStatistics
+                || !QaStatisticFieldCatalog.IsApplicable(
+                    definition,
+                    characteristics)
+                || QaStatisticsCalculationService.ClassifyThreshold(
+                    statistic.BrokenValueCount,
+                    statistic.TotalApplicableNonblankValues)
+                    != QaFindingSeverity.Failure)
+            {
+                continue;
+            }
+
+            checkIds.Add(definition.RelatedChecklistId);
+        }
+
+        return checkIds;
     }
 
     private void AddExpectedDatabaseStatisticWarnings(
@@ -502,16 +564,23 @@ public sealed class QaFindingSynchronizationService
         }
     }
 
-    private static QaFinding CreateBlankStatisticWarning(
+    private static QaFinding CreateBlankStatisticFinding(
         QaStatisticFieldDefinition definition,
         QaBlankValueStatistic statistic,
-        decimal calculatedPercentage)
+        decimal calculatedPercentage,
+        QaFindingSeverity severity)
     {
+        bool isFailure = severity == QaFindingSeverity.Failure;
+
         return new QaFinding
         {
-            FindingId = QaFindingIds.WarningForBlankStatistic(definition.Id),
-            Severity = QaFindingSeverity.Warning,
-            Title = $"High blank-value percentage: {definition.DisplayName}",
+            FindingId = isFailure
+                ? QaFindingIds.FailureForBlankStatistic(definition.Id)
+                : QaFindingIds.WarningForBlankStatistic(definition.Id),
+            Severity = severity,
+            Title = isFailure
+                ? $"High blank-value percentage: {definition.DisplayName}"
+                : $"Blank values found: {definition.DisplayName}",
             Description =
                 $"{definition.DisplayName} has {statistic.BlankCount} blank values out of {statistic.TotalApplicableRows} applicable rows ({FormatPercentage(calculatedPercentage)}%).",
             Resolution = QaFindingResolution.Active,
@@ -519,19 +588,26 @@ public sealed class QaFindingSynchronizationService
         };
     }
 
-    private static QaFinding CreateBrokenStatisticFailure(
+    private static QaFinding CreateBrokenStatisticFinding(
         QaStatisticFieldDefinition definition,
         QaBrokenDataStatistic statistic,
-        decimal calculatedPercentage)
+        decimal calculatedPercentage,
+        QaFindingSeverity severity)
     {
+        bool isFailure = severity == QaFindingSeverity.Failure;
         string description =
             $"{definition.DisplayName} has {statistic.BrokenValueCount} broken populated values out of {statistic.TotalApplicableNonblankValues} applicable nonblank values ({FormatPercentage(calculatedPercentage)}%).";
 
         return new QaFinding
         {
-            FindingId = QaFindingIds.FailureForBrokenStatistic(definition.Id),
-            Severity = QaFindingSeverity.Failure,
-            Title = $"Broken data found: {definition.DisplayName}",
+            FindingId = isFailure
+                ? QaFindingIds.FailureForBrokenStatistic(definition.Id)
+                : QaFindingIds.WarningForBrokenStatistic(definition.Id),
+            RelatedCheckId = definition.RelatedChecklistId,
+            Severity = severity,
+            Title = isFailure
+                ? $"High broken-data percentage: {definition.DisplayName}"
+                : $"Broken data found: {definition.DisplayName}",
             Description = AppendExplanation(description, statistic.Explanation),
             Resolution = QaFindingResolution.Active,
             Source = QaFindingSource.Statistic
@@ -894,8 +970,10 @@ public sealed class QaFindingSynchronizationService
         foreach (QaStatisticFieldDefinition definition in statisticFieldDefinitions)
         {
             if (definition.SupportsBlankStatistics
-                && !ids.Add(
-                    QaFindingIds.WarningForBlankStatistic(definition.Id)))
+                && (!ids.Add(
+                        QaFindingIds.WarningForBlankStatistic(definition.Id))
+                    || !ids.Add(
+                        QaFindingIds.FailureForBlankStatistic(definition.Id))))
             {
                 throw new ArgumentException(
                     $"Statistic field ID '{definition.Id}' collides with a deterministic blank-statistic finding ID.",
@@ -903,8 +981,10 @@ public sealed class QaFindingSynchronizationService
             }
 
             if (definition.SupportsBrokenDataStatistics
-                && !ids.Add(
-                    QaFindingIds.FailureForBrokenStatistic(definition.Id)))
+                && (!ids.Add(
+                        QaFindingIds.WarningForBrokenStatistic(definition.Id))
+                    || !ids.Add(
+                        QaFindingIds.FailureForBrokenStatistic(definition.Id))))
             {
                 throw new ArgumentException(
                     $"Statistic field ID '{definition.Id}' collides with a deterministic broken-data finding ID.",

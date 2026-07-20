@@ -9,6 +9,7 @@ namespace DocumentationLoggingDashboard.QAReports.Forms.Controls;
 public partial class QaChecklistItemControl : UserControl
 {
     private QaCheckResult? boundResult;
+    private bool hasPendingNotesEdit;
     private bool isApplicable;
     private bool isSynchronizing;
 
@@ -22,7 +23,8 @@ public partial class QaChecklistItemControl : UserControl
             ApplyUserStatus(QaCheckStatus.Fail, failRadioButton.Checked);
         warningFoundCheckBox.CheckedChanged += (_, _) =>
             ApplyWarningSelection();
-        notesTextBox.TextChanged += (_, _) => ApplyNotes();
+        notesTextBox.TextChanged += (_, _) => MarkNotesEditPending();
+        notesTextBox.Validated += (_, _) => CommitPendingTextEdits();
     }
 
     public string CheckId { get; private set; } = string.Empty;
@@ -57,8 +59,28 @@ public partial class QaChecklistItemControl : UserControl
                 nameof(result));
         }
 
+        bool bindingChanged = !ReferenceEquals(boundResult, result);
+
+        if (bindingChanged && boundResult is not null)
+        {
+            bool sameCheckId = boundResult.CheckId.Equals(
+                result.CheckId,
+                StringComparison.Ordinal);
+            _ = CommitPendingTextEditsCore(raiseResultChanged: false);
+
+            if (sameCheckId)
+            {
+                result.Notes = boundResult.Notes;
+            }
+        }
+
         CheckId = definition.Id;
         boundResult = result;
+        if (bindingChanged)
+        {
+            hasPendingNotesEdit = false;
+        }
+
         boundResult.ResultSource = QaResultSource.Manual;
         isApplicable = boundResult.Status != QaCheckStatus.NotApplicable;
 
@@ -80,6 +102,15 @@ public partial class QaChecklistItemControl : UserControl
     }
 
     /// <summary>
+    /// Commits the final normalized note and raises at most one logical result
+    /// change event.
+    /// </summary>
+    public bool CommitPendingTextEdits()
+    {
+        return CommitPendingTextEditsCore(raiseResultChanged: true);
+    }
+
+    /// <summary>
     /// Synchronizes the warning checkbox from the corresponding deterministic finding.
     /// Programmatic synchronization does not raise <see cref="ResultChanged"/>.
     /// </summary>
@@ -98,6 +129,8 @@ public partial class QaChecklistItemControl : UserControl
     public void SetApplicable(bool applicable)
     {
         QaCheckResult result = GetBoundResult();
+        bool pendingTextChanged =
+            CommitPendingTextEditsCore(raiseResultChanged: false);
         QaCheckStatus previousStatus = result.Status;
         string? previousNotes = result.Notes;
         bool previouslyWarningFound = WarningFound;
@@ -120,7 +153,8 @@ public partial class QaChecklistItemControl : UserControl
         isApplicable = applicable;
         SynchronizeFromResult();
 
-        if (previousStatus != result.Status
+        if (pendingTextChanged
+            || previousStatus != result.Status
             || !string.Equals(previousNotes, result.Notes, StringComparison.Ordinal)
             || previouslyWarningFound != WarningFound)
         {
@@ -135,9 +169,17 @@ public partial class QaChecklistItemControl : UserControl
             return;
         }
 
+        bool pendingTextChanged =
+            CommitPendingTextEditsCore(raiseResultChanged: false);
+
         if (boundResult.Status == status
             && boundResult.ResultSource == QaResultSource.Manual)
         {
+            if (pendingTextChanged)
+            {
+                OnResultChanged();
+            }
+
             return;
         }
 
@@ -154,9 +196,18 @@ public partial class QaChecklistItemControl : UserControl
             return;
         }
 
+        bool pendingTextChanged =
+            CommitPendingTextEditsCore(raiseResultChanged: false);
+
         if (!isApplicable || boundResult.Status != QaCheckStatus.Pass)
         {
             SetWarningFoundCore(warningFound: false);
+
+            if (pendingTextChanged)
+            {
+                OnResultChanged();
+            }
+
             return;
         }
 
@@ -164,24 +215,48 @@ public partial class QaChecklistItemControl : UserControl
         OnResultChanged();
     }
 
-    private void ApplyNotes()
+    private void MarkNotesEditPending()
     {
         if (isSynchronizing || !isApplicable || boundResult is null)
         {
             return;
         }
 
-        string? notes = TrimToNull(notesTextBox.Text);
+        hasPendingNotesEdit = true;
         UpdateWarningExplanationState();
+    }
 
-        if (string.Equals(boundResult.Notes, notes, StringComparison.Ordinal))
+    private bool CommitPendingTextEditsCore(bool raiseResultChanged)
+    {
+        if (isSynchronizing
+            || !hasPendingNotesEdit
+            || !isApplicable
+            || boundResult is null)
         {
-            return;
+            return false;
         }
 
-        boundResult.Notes = notes;
-        boundResult.ResultSource = QaResultSource.Manual;
-        OnResultChanged();
+        string? notes = TrimToNull(notesTextBox.Text);
+        bool changed = !string.Equals(
+            boundResult.Notes,
+            notes,
+            StringComparison.Ordinal);
+
+        if (changed)
+        {
+            boundResult.Notes = notes;
+            boundResult.ResultSource = QaResultSource.Manual;
+        }
+
+        hasPendingNotesEdit = false;
+        UpdateWarningExplanationState();
+
+        if (changed && raiseResultChanged)
+        {
+            OnResultChanged();
+        }
+
+        return changed;
     }
 
     private void SynchronizeFromResult()
@@ -200,12 +275,14 @@ public partial class QaChecklistItemControl : UserControl
 
             if (!isApplicable)
             {
+                hasPendingNotesEdit = false;
                 if (notesTextBox.Text.Length != 0)
                 {
                     notesTextBox.Clear();
                 }
             }
-            else if (!OptionalTextMatches(notesTextBox.Text, result.Notes))
+            else if (!hasPendingNotesEdit
+                && !OptionalTextMatches(notesTextBox.Text, result.Notes))
             {
                 notesTextBox.Text = result.Notes ?? string.Empty;
             }

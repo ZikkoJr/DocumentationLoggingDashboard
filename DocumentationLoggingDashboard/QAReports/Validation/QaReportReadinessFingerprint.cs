@@ -179,6 +179,10 @@ internal static class QaReportReadinessFingerprint
             AppendString(value, "blankDisplayName", statistic.DisplayName);
             AppendInt(value, "blankCount", statistic.BlankCount);
             AppendInt(value, "blankRows", statistic.TotalApplicableRows);
+            AppendBool(
+                value,
+                "blankRowsAutomatic",
+                statistic.UseAutomaticTotalApplicableRows);
             AppendDecimal(value, "blankPercentage", statistic.BlankPercentage);
         }
 
@@ -200,6 +204,10 @@ internal static class QaReportReadinessFingerprint
                 value,
                 "brokenNonblankRows",
                 statistic.TotalApplicableNonblankValues);
+            AppendBool(
+                value,
+                "brokenNonblankRowsAutomatic",
+                statistic.UseAutomaticTotalApplicableNonblankValues);
             AppendDecimal(
                 value,
                 "brokenPercentage",

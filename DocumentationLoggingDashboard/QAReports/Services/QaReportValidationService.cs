@@ -611,6 +611,13 @@ public sealed class QaReportValidationService
                 $"Applicable-row count for '{definition.DisplayName}' cannot be negative.");
         }
 
+        if (statistic.UseAutomaticTotalApplicableRows
+            && statistic.TotalApplicableRows != totalDataRows)
+        {
+            errors.Add(
+                $"Automatic applicable-row count for '{definition.DisplayName}' must equal Total Data Rows.");
+        }
+
         string presenceCheckId = GetPresenceChecklistId(definition.Id);
         bool missingFieldIsDocumented = resultsById.TryGetValue(
             presenceCheckId,
@@ -729,16 +736,35 @@ public sealed class QaReportValidationService
         {
             long derived = (long)blankStatistic.TotalApplicableRows
                 - blankStatistic.BlankCount;
+            string presenceCheckId = GetPresenceChecklistId(definition.Id);
+            bool missingFieldIsDocumented = resultsById.TryGetValue(
+                    presenceCheckId,
+                    out QaCheckResult? presenceResult)
+                && presenceResult.Status == QaCheckStatus.Fail;
 
             if (derived < 0)
             {
                 errors.Add(
                     $"Derived nonblank denominator for '{definition.DisplayName}' cannot be negative.");
             }
-            else if (statistic.TotalApplicableNonblankValues != derived)
+            else if (derived > 0
+                && statistic.TotalApplicableNonblankValues == 0
+                && !missingFieldIsDocumented)
             {
                 errors.Add(
-                    $"Broken-data denominator for '{definition.DisplayName}' must equal its blank-derived nonblank count.");
+                    $"Nonblank denominator for '{definition.DisplayName}' is required when its blank-derived nonblank population is positive.");
+            }
+            else if (statistic.UseAutomaticTotalApplicableNonblankValues
+                && statistic.TotalApplicableNonblankValues != derived)
+            {
+                errors.Add(
+                    $"Automatic broken-data denominator for '{definition.DisplayName}' must equal its blank-derived nonblank count.");
+            }
+            else if (!statistic.UseAutomaticTotalApplicableNonblankValues
+                && statistic.TotalApplicableNonblankValues > derived)
+            {
+                errors.Add(
+                    $"Manual broken-data denominator for '{definition.DisplayName}' cannot exceed its blank-derived nonblank population.");
             }
         }
 
@@ -752,7 +778,10 @@ public sealed class QaReportValidationService
                 $"Broken-data percentage for '{definition.DisplayName}' is not synchronized with its counts.");
         }
 
-        if (statistic.BrokenValueCount > 0
+        if (QaStatisticsCalculationService.ClassifyThreshold(
+                statistic.BrokenValueCount,
+                statistic.TotalApplicableNonblankValues)
+                == QaFindingSeverity.Failure
             && definition.RelatedChecklistId is not null
             && (!resultsById.TryGetValue(
                     definition.RelatedChecklistId,
@@ -760,7 +789,7 @@ public sealed class QaReportValidationService
                 || relatedResult.Status != QaCheckStatus.Fail))
         {
             errors.Add(
-                $"Broken data for '{definition.DisplayName}' requires checklist item '{definition.RelatedChecklistId}' to be Fail.");
+                $"Broken data above 50% for '{definition.DisplayName}' requires checklist item '{definition.RelatedChecklistId}' to be Fail.");
         }
     }
 
@@ -1344,6 +1373,11 @@ public sealed class QaReportValidationService
     {
         Dictionary<string, ExpectedFinding> expected =
             new(StringComparer.Ordinal);
+        HashSet<string> thresholdCanonicalChecklistFailureIds =
+            GetBrokenThresholdFailureRelatedCheckIds(
+                characteristics,
+                statistics,
+                errors);
 
         foreach (QaCheckDefinition definition in checklistDefinitions)
         {
@@ -1354,12 +1388,17 @@ public sealed class QaReportValidationService
 
             if (result.Status == QaCheckStatus.Fail)
             {
-                AddExpected(
-                    expected,
-                    QaFindingIds.FailureForCheck(definition.Id),
-                    QaFindingSeverity.Failure,
-                    QaFindingSource.Checklist,
-                    errors);
+                if (!ShouldSuppressChecklistFailureForThreshold(
+                        result,
+                        thresholdCanonicalChecklistFailureIds))
+                {
+                    AddExpected(
+                        expected,
+                        QaFindingIds.FailureForCheck(definition.Id),
+                        QaFindingSeverity.Failure,
+                        QaFindingSource.Checklist,
+                        errors);
+                }
             }
 
             string warningId = QaFindingIds.WarningForCheck(definition.Id);
@@ -1425,17 +1464,19 @@ public sealed class QaReportValidationService
                 QaStatisticFieldCatalog.GetRequired(fieldId);
             bool applicable = characteristics is not null
                 && IsStatisticApplicable(definition, characteristics, errors);
-            decimal calculatedPercentage =
-                QaStatisticsCalculationService.CalculatePercentage(
+            QaFindingSeverity? severity =
+                QaStatisticsCalculationService.ClassifyThreshold(
                     statistic.BlankCount,
                     statistic.TotalApplicableRows);
 
-            if (applicable && calculatedPercentage > 50m)
+            if (applicable && severity is not null)
             {
                 AddExpected(
                     expected,
-                    QaFindingIds.WarningForBlankStatistic(fieldId),
-                    QaFindingSeverity.Warning,
+                    severity == QaFindingSeverity.Failure
+                        ? QaFindingIds.FailureForBlankStatistic(fieldId)
+                        : QaFindingIds.WarningForBlankStatistic(fieldId),
+                    severity.Value,
                     QaFindingSource.Statistic,
                     errors);
             }
@@ -1448,15 +1489,19 @@ public sealed class QaReportValidationService
                 QaStatisticFieldCatalog.GetRequired(fieldId);
             bool applicable = characteristics is not null
                 && IsStatisticApplicable(definition, characteristics, errors);
+            QaFindingSeverity? severity =
+                QaStatisticsCalculationService.ClassifyThreshold(
+                    statistic.BrokenValueCount,
+                    statistic.TotalApplicableNonblankValues);
 
-            if (applicable
-                && statistic.BrokenValueCount > 0
-                && definition.RelatedChecklistId is null)
+            if (applicable && severity is not null)
             {
                 AddExpected(
                     expected,
-                    QaFindingIds.FailureForBrokenStatistic(fieldId),
-                    QaFindingSeverity.Failure,
+                    severity == QaFindingSeverity.Failure
+                        ? QaFindingIds.FailureForBrokenStatistic(fieldId)
+                        : QaFindingIds.WarningForBrokenStatistic(fieldId),
+                    severity.Value,
                     QaFindingSource.Statistic,
                     errors);
             }
@@ -1562,6 +1607,51 @@ public sealed class QaReportValidationService
         return expected;
     }
 
+    private static bool ShouldSuppressChecklistFailureForThreshold(
+        QaCheckResult result,
+        ISet<string> thresholdCanonicalChecklistFailureIds)
+    {
+        return thresholdCanonicalChecklistFailureIds.Contains(result.CheckId)
+            && TrimToNull(result.Notes) is null;
+    }
+
+    private static HashSet<string> GetBrokenThresholdFailureRelatedCheckIds(
+        QaFileCharacteristics? characteristics,
+        StatisticsSnapshot statistics,
+        ICollection<string> errors)
+    {
+        HashSet<string> checkIds = new(StringComparer.Ordinal);
+
+        if (characteristics is null)
+        {
+            return checkIds;
+        }
+
+        foreach ((string fieldId, QaBrokenDataStatistic statistic)
+                 in statistics.BrokenById)
+        {
+            QaStatisticFieldDefinition definition =
+                QaStatisticFieldCatalog.GetRequired(fieldId);
+
+            if (string.IsNullOrWhiteSpace(definition.RelatedChecklistId)
+                || !IsStatisticApplicable(
+                    definition,
+                    characteristics,
+                    errors)
+                || QaStatisticsCalculationService.ClassifyThreshold(
+                    statistic.BrokenValueCount,
+                    statistic.TotalApplicableNonblankValues)
+                    != QaFindingSeverity.Failure)
+            {
+                continue;
+            }
+
+            checkIds.Add(definition.RelatedChecklistId);
+        }
+
+        return checkIds;
+    }
+
     private static void ValidateFindingContext(
         IReadOnlyDictionary<string, QaFinding> findingsById,
         ICollection<string> errors)
@@ -1597,6 +1687,16 @@ public sealed class QaReportValidationService
                     && !description.Equals(
                         definition.Description,
                         StringComparison.Ordinal);
+                hasContextualGeneratedDescription |= findingsById.Values.Any(
+                    candidate => candidate.Severity == QaFindingSeverity.Failure
+                        && candidate.Source == QaFindingSource.Statistic
+                        && string.Equals(
+                            candidate.RelatedCheckId,
+                            definition.Id,
+                            StringComparison.Ordinal)
+                        && candidate.FindingId.StartsWith(
+                            "FAIL:STAT:BROKEN:",
+                            StringComparison.Ordinal));
 
                 if (!hasContextualGeneratedDescription)
                 {
@@ -1641,6 +1741,8 @@ public sealed class QaReportValidationService
                  in QaStatisticFieldCatalog.Definitions)
         {
             ids.Add(QaFindingIds.WarningForBlankStatistic(definition.Id));
+            ids.Add(QaFindingIds.FailureForBlankStatistic(definition.Id));
+            ids.Add(QaFindingIds.WarningForBrokenStatistic(definition.Id));
             ids.Add(QaFindingIds.FailureForBrokenStatistic(definition.Id));
         }
 

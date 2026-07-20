@@ -8,6 +8,10 @@ The phase does not add a caller-selected path, `SaveFileDialog`, V1 destination,
 
 This document records the Phase 9 implementation and its focused existing-report detection correction. The original Phase 9 commit was pushed for review, but Phase 9 is not approved, merged, tagged, or released.
 
+> **Post-Phase-10 controlled-pilot correction boundary:** The P1 Blank/Broken Statistics correction documented in `Pilot-Correction-Blank-Broken-Statistics.md` does not change Phase 9's paired-save transaction, filename, storage-path, overwrite, or index-format contracts. It does change the validation result, readiness fingerprint, calculated status, PDF content, and index status that Phase 9 consumes for affected reports. The final isolated save/PDF/index suite passed 7/7 in Debug and Release with byte-identical Hotel/PMS pairs, seven expected index statuses, and no transaction leftovers. That current evidence is recorded separately in the correction record; the historical transaction results below remain evidence only for their original save-mechanism scope.
+
+> **Deferred-text controlled-pilot boundary:** The final P2 correction commits pending text before the readiness/save transaction begins. Five additional synthetic scenarios passed with final text in PDFs, byte-identical Hotel/PMS pairs, correct index statuses, and no transaction artifacts. The final matrix also passed blocked-output guards and logical-report overwrite replacement. The transaction and index formats are unchanged. See `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
+
 ## Approved baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -269,7 +273,7 @@ Every save attempt executes the existing synchronization sequence before renderi
 6. assign `CurrentReport.ReportStatus` only when ready;
 7. store and display the result and select the Statistics/Readiness tab.
 
-The gate requires `IsReady`, zero blocking errors, a calculated status, exact agreement with `CurrentReport.ReportStatus`, and a nonblank readiness fingerprint. A calculated Fail status is still a ready, valid final status and can be saved. The Phase 8 renderer and Phase 9 save service independently recheck readiness/fingerprint invariants; neither trusts an old `LastReadinessResult` by itself.
+The gate requires `IsReady`, zero blocking errors, a calculated status, exact agreement with `CurrentReport.ReportStatus`, and a nonblank readiness fingerprint. A calculated Fail status is still a ready, valid final status and can be saved. Under the corrected Blank/Broken rules, a positive percentage through and including 50% produces a Warning, while a percentage above 50% produces a Failure. A handled Failure retains its finding severity and remains visible under Failed Checks; if no active Failure remains, the overall calculated status is Pass with Warnings. The Phase 8 renderer and Phase 9 save service independently recheck readiness/fingerprint invariants, including denominator mode and values; neither trusts an old `LastReadinessResult` by itself.
 
 When `CurrentReport.CreatedBy` is blank, the form shows one default-No confirmation before taking the timestamp or rendering. It identifies `QaReportValidationResult.EffectiveCreatedBy`, which is the approved non-mutating fallback. Choosing No performs no render and no write. Choosing Yes does not mutate `CurrentReport.CreatedBy`; the exact effective value is used by the Phase 8 PDF and the index.
 
@@ -434,6 +438,8 @@ Result: exit code 0, 0 warnings, 0 errors, 3.83 seconds, with `HEAD` at `42a5b06
 ### Directly executed Phase 9 tests
 
 Status: **Pass for the directly exercised service, renderer, filesystem, index, and transaction scope**
+
+**Historical-evidence boundary:** The assertion counts and Pass labels in this section describe the Phase 9 baseline when they were run. They remain valid evidence for paired transaction mechanics, byte reuse/equality, overwrite reconciliation, rollback, index syntax, and storage containment. Cases whose expected status or finding content depended on the prior Blank/Broken semantics remain superseded as historical semantic evidence. The separate current correction run passed seven synthetic status/save/PDF/index scenarios; see `Pilot-Correction-Blank-Broken-Statistics.md` for its exact hashes and limitations rather than inferring a result from this Phase 9 count.
 
 An external `net10.0-windows` harness referenced the real application project and used synthetic metadata plus temporary documentation roots outside the repository. Its build completed with 0 warnings and 0 errors. Its final run reported `PASS assertions=263` and `PASS fault-assertions=56`; the harness and all runtime roots were then removed.
 

@@ -6,6 +6,23 @@ Phase 6 extends the existing Phase 5 `QaReportForm` with in-memory finding gener
 
 This phase remains an incomplete draft workflow. It does not calculate report status or completion, validate final completion, collect or evaluate statistics, generate statistic findings, generate a Created By fallback, create a Report ID, parse a raw file or spreadsheet, access a database, run automation, generate a PDF, save a report, or write a QA Report index entry. Close and Escape still discard the form instance without persistence.
 
+> **Post-Phase-10 pilot correction:** The paragraphs above accurately describe the historical Phase 6 boundary. The current `QaFindingSynchronizationService` has since been extended by Phase 7 and the controlled-pilot correction. It now manages all four Blank/Broken threshold ID families while preserving the Phase 6 identity and resolution lifecycle. Final focused semantic automation passed 7/7 in both Debug and Release, including finding-resolution noncausality and the Notes-conditioned mapped-Failure paths. The authoritative correction evidence and remaining P2 Notes-discriminator risk are in `Pilot-Correction-Blank-Broken-Statistics.md`; historical Phase 6 verification is not evidence for the corrected statistic thresholds.
+
+> **Deferred-text pilot correction:** Finding Custom Script Name and Resolution Notes now remain control-local drafts while typing. `Validated`, resolution transitions, readiness/save, tab/workflow transitions, and form closing flush the normalized value. Same-ID refreshes do not overwrite a dirty draft, and a multi-finding action flush performs one final synchronization/refresh. Resolution/severity/ID and approved clearing rules are unchanged. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
+
+The corrected statistic finding families are:
+
+```text
+WARN:STAT:BLANK:<FieldId>
+FAIL:STAT:BLANK:<FieldId>
+WARN:STAT:BROKEN:<FieldId>
+FAIL:STAT:BROKEN:<FieldId>
+```
+
+A Warning/Failure threshold transition changes the deterministic ID. The old finding and its resolution are removed, and the replacement starts Active. Unrelated edits preserve resolution only while the same ID remains expected. A mapped Broken result above 50% uses the canonical statistics Failure. Its directly related generic checklist Failure is suppressed only when the current failing checklist result has blank Notes after trimming, which represents the threshold-only path. Nonblank checklist Notes document a separate contextual checklist defect, so both Failures remain. Finding resolution state alone is not causal and does not control suppression.
+
+This Notes-based distinction is a known residual risk, not a new domain contract. The model has no explicit checklist-failure cause marker, so a separate defect recorded with blank Notes can be mistaken for the threshold-only path. Operators should enter nonblank contextual Notes when a mapped checklist Failure documents an independent defect. Adding a cause marker would require separate approval because it changes the model/domain contract.
+
 ## Repository baseline
 
 - Required and active branch: `v2-qa-reports`.

@@ -60,19 +60,19 @@ public static class QaChecklistCatalog
         Definition(
             QaChecklistIds.Raw.FirstNameValuesValid,
             "First Name values contain first names",
-            "Confirms that First Name values contain first names; email addresses or unrelated values in First Name are examples of failures.",
+            "Confirms that populated First Name values contain first names. Email addresses or unrelated populated values are Broken Data; up to and including 50% may remain Pass with a Warning, while above 50% requires Fail. Blank cells are evaluated separately.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.SeparateNameColumns),
         Definition(
             QaChecklistIds.Raw.LastNameValuesValid,
             "Last Name values contain last names",
-            "Confirms that Last Name values contain last names rather than unrelated or misplaced values.",
+            "Confirms that populated Last Name values contain last names. Unrelated or misplaced populated values are Broken Data; up to and including 50% may remain Pass with a Warning, while above 50% requires Fail. Blank cells are evaluated separately.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.SeparateNameColumns),
         Definition(
             QaChecklistIds.Raw.FullNameValuesValid,
             "Full Name values contain valid full names",
-            "Confirms that Full Name values contain usable full guest names when the file uses a single name column.",
+            "Confirms that populated Full Name values contain usable full guest names when the file uses one name column. Malformed populated values are Broken Data; up to and including 50% may remain Pass with a Warning, while above 50% requires Fail. Blank cells are evaluated separately.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.FullNameColumn),
         Definition(
@@ -84,7 +84,7 @@ public static class QaChecklistCatalog
         Definition(
             QaChecklistIds.Raw.DateFormatValid,
             "Date values use valid and interpretable formats",
-            "Confirms that date values can be interpreted consistently during manual QA review.",
+            "Confirms that populated date values can be interpreted consistently. Invalid populated dates are Broken Data; up to and including 50% may remain Pass with a Warning, while above 50% requires Fail. Blank cells are evaluated separately.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.Always),
         Definition(
