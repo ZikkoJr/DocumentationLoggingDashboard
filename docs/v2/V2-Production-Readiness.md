@@ -16,8 +16,12 @@
 
 The tracked document cannot embed the SHA of the commit that contains its own
 final text because that would change the commit SHA. The exact final pushed SHA
-is therefore authoritative in `production-manifest.txt`; this file records the
-fixed starting identity, branch, package, results, and external package details.
+is therefore authoritative in `production-manifest.txt`. The .NET publish also
+embeds source-revision information in the executable and PDB, so their final
+hashes have the same self-reference constraint. This file records the fixed
+starting identity, branch, package, results, stable artifact sizes, and external
+package procedure; the external manifest records the exact final SHA, folder,
+and final executable/PDB hashes.
 
 ## Included implementation and corrections
 
@@ -137,13 +141,16 @@ Warning/Failed Checks presence, custom-script name, and final deferred markers.
   final commit SHA would change that SHA.
 - `appsettings.json`: 53 bytes; SHA-256
   `D8907CDD3C2440BD404B7C1A23837AAAD4449F428AE64E2A1FFF038DD6FA2E03`.
-- `DocumentationLoggingDashboard.exe`: 118,648,213 bytes; SHA-256
-  `6748234513FC8D1E967D09F0A16CFFCD00BCF8B1A325E58D0385D8B44F1CB4FA`.
-- `DocumentationLoggingDashboard.pdb`: 122,536 bytes; SHA-256
-  `9E2EC4CCC33C297536968A3D6B292F1C031A800C2BF37878B245E62426EC36C7`.
+- `DocumentationLoggingDashboard.exe`: 118,648,213 bytes. Its final SHA-256 is
+  recorded in the external manifest produced after the final documentation
+  commit is pushed.
+- `DocumentationLoggingDashboard.pdb`: 122,536 bytes. Its final SHA-256 is
+  recorded in the external manifest produced after the final documentation
+  commit is pushed.
 - Aggregate production-artifact size: 118,770,802 bytes.
-- The final publish must reproduce this inventory and these hashes before the
-  files are copied to the immutable production-candidate folder.
+- The final publish must reproduce this inventory, the stable sizes, and the
+  `appsettings.json` hash before the files are copied. Its executable/PDB hashes
+  are then fixed in the never-launched immutable package and external manifest.
 - `production-manifest.txt` records the exact pushed full/short SHA, Windows and
   SDK context, target, package version, exact publish command, build/regression
   results, and the production-artifact inventory, sizes, hashes, and aggregate.
