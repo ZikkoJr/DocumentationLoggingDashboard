@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentationLoggingDashboard", "DocumentationLoggingDashboard\DocumentationLoggingDashboard.csproj", "{71C2A874-0F38-4616-8286-00D1AB9E2C47}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentationLoggingDashboard.GeometryTests", "tests\DocumentationLoggingDashboard.GeometryTests\DocumentationLoggingDashboard.GeometryTests.csproj", "{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,18 @@ Global
 		{71C2A874-0F38-4616-8286-00D1AB9E2C47}.Release|x64.Build.0 = Release|Any CPU
 		{71C2A874-0F38-4616-8286-00D1AB9E2C47}.Release|x86.ActiveCfg = Release|Any CPU
 		{71C2A874-0F38-4616-8286-00D1AB9E2C47}.Release|x86.Build.0 = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|x64.Build.0 = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Debug|x86.Build.0 = Debug|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|x64.ActiveCfg = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|x64.Build.0 = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|x86.ActiveCfg = Release|Any CPU
+		{5E2DC7E0-743D-4C0A-82B1-8A73A65C0F4D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

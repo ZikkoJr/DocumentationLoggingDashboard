@@ -1,22 +1,39 @@
 Documentation Logging Dashboard Release Instructions
 ====================================================
 
-This release workflow creates a local Windows executable that can be launched by
-double-clicking the .exe. It does not add an installer, database, login system,
-or cloud sync.
+This file distinguishes a development publish from the reviewed V2 production
+candidate. V2 does not add an installer, database, login system, or cloud sync.
 
-How to publish
---------------
+Production candidate
+--------------------
+
+Use only the separately created immutable folder named:
+
+C:\Users\Gabriel Ramdeholl\Desktop\DocumentationLoggingDashboard-V2-Production-<SHORTSHA>
+
+The exact approved folder contains DocumentationLoggingDashboard.exe,
+DocumentationLoggingDashboard.pdb, appsettings.json, production-manifest.txt,
+and START-HERE.txt. Read START-HERE.txt before first launch. Do not launch the
+production candidate from the Git repository, bin\Debug, bin\Release, the old
+V1 PublishedApp folder, the frozen pilot package, or a temporary publish folder.
+
+Keep the operational documentation root separate from the application folder
+and back it up before first production use. The Debugging Log Hotel/PMS routing
+enhancement is deferred to V2.1.
+
+Development publish only
+------------------------
 
 From the repository root, run:
 
 powershell -ExecutionPolicy Bypass -File .\publish-windows.ps1
 
 The script publishes the app for Windows x64 using Release configuration,
-self-contained output, and single-file publishing.
+self-contained output, and single-file publishing. Its PublishedApp output is a
+development location and is not the immutable V2 production candidate.
 
-Published app location
-----------------------
+Development publish location
+----------------------------
 
 The published app folder is:
 
@@ -26,8 +43,8 @@ The expected executable is:
 
 PublishedApp\win-x64\DocumentationLoggingDashboard.exe
 
-Launch the dashboard
---------------------
+Launch the development publish
+------------------------------
 
 Open PublishedApp\win-x64, then double-click:
 
@@ -35,8 +52,8 @@ DocumentationLoggingDashboard.exe
 
 You do not need to open VS Code or Visual Studio to run the published app.
 
-Create a desktop shortcut
--------------------------
+Development shortcut
+--------------------
 
 1. Open PublishedApp\win-x64.
 2. Right-click DocumentationLoggingDashboard.exe.

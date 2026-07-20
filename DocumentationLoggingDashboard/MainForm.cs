@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using DocumentationLoggingDashboard.Models;
+using DocumentationLoggingDashboard.QAReports.Forms;
+using DocumentationLoggingDashboard.QAReports.Models;
+using DocumentationLoggingDashboard.QAReports.Services;
 using DocumentationLoggingDashboard.Services;
 
 namespace DocumentationLoggingDashboard;
@@ -50,6 +53,8 @@ public partial class MainForm : Form
         openLogIndexButton.Click += (_, _) => OpenLogIndex();
         changeLogsFolderButton.Click += (_, _) => ChangeLogsFolder();
         resetDefaultFolderButton.Click += (_, _) => ResetToDefaultFolder();
+        createQaReportButton.Click += (_, _) => OpenQaReport();
+        manageQaHotelsPmsButton.Click += (_, _) => OpenQaMetadataManagement();
     }
 
     private void RenderFieldsForSelectedLogType()
@@ -289,6 +294,130 @@ public partial class MainForm : Form
         }
     }
 
+    private void OpenQaMetadataManagement()
+    {
+        try
+        {
+            var dependencies = CreateQaWorkflowDependencies();
+
+            using QaMetadataManagementForm form = new(
+                dependencies.MetadataService,
+                dependencies.PmsSystems,
+                dependencies.Hotels);
+            form.ShowDialog(this);
+        }
+        catch (QaUnsupportedMetadataSchemaException ex)
+        {
+            ShowQaWorkflowError(
+                "QA Metadata Management",
+                "QA metadata uses an unsupported version. The existing metadata files were not changed.",
+                ex);
+        }
+        catch (QaStorageInitializationException ex)
+        {
+            ShowQaWorkflowError(
+                "QA Metadata Management",
+                "QA storage could not be initialized in the configured documentation folder. Check that the folder is available and writable.",
+                ex);
+        }
+        catch (QaMetadataException ex)
+        {
+            ShowQaWorkflowError(
+                "QA Metadata Management",
+                "QA metadata could not be loaded because a metadata file is invalid or inaccessible. The existing file was not changed.",
+                ex);
+        }
+        catch (Exception ex) when (ex is ArgumentException
+            or NotSupportedException
+            or PathTooLongException
+            or InvalidOperationException)
+        {
+            ShowQaWorkflowError(
+                "QA Metadata Management",
+                "The configured documentation folder could not be used for QA setup.",
+                ex);
+        }
+        catch (Exception ex)
+        {
+            ShowQaWorkflowError(
+                "QA Metadata Management",
+                "QA metadata management could not be opened.",
+                ex);
+        }
+    }
+
+    private void OpenQaReport()
+    {
+        try
+        {
+            var dependencies = CreateQaWorkflowDependencies();
+
+            using QaReportForm form = new(
+                dependencies.MetadataService,
+                dependencies.PmsSystems,
+                dependencies.Hotels,
+                dependencies.Paths);
+            form.ShowDialog(this);
+        }
+        catch (QaUnsupportedMetadataSchemaException ex)
+        {
+            ShowQaWorkflowError(
+                "Create QA Report",
+                "QA metadata uses an unsupported version. The existing metadata files were not changed.",
+                ex);
+        }
+        catch (QaStorageInitializationException ex)
+        {
+            ShowQaWorkflowError(
+                "Create QA Report",
+                "QA storage could not be initialized in the configured documentation folder. Check that the folder is available and writable.",
+                ex);
+        }
+        catch (QaMetadataException ex)
+        {
+            ShowQaWorkflowError(
+                "Create QA Report",
+                "QA metadata could not be loaded because a metadata file is invalid or inaccessible. The existing file was not changed.",
+                ex);
+        }
+        catch (Exception ex) when (ex is ArgumentException
+            or NotSupportedException
+            or PathTooLongException
+            or InvalidOperationException)
+        {
+            ShowQaWorkflowError(
+                "Create QA Report",
+                "The configured documentation folder could not be used for QA setup.",
+                ex);
+        }
+        catch (Exception ex)
+        {
+            ShowQaWorkflowError(
+                "Create QA Report",
+                "The QA report form could not be opened.",
+                ex);
+        }
+    }
+
+    private (
+        QaMetadataService MetadataService,
+        IReadOnlyList<QaPmsMetadata> PmsSystems,
+        IReadOnlyList<QaHotelMetadata> Hotels,
+        QaStoragePaths Paths) CreateQaWorkflowDependencies()
+    {
+        string documentationRoot = settingsService.GetDocumentationRootFolder();
+        QaStoragePaths paths = new(documentationRoot);
+        QaStorageInitializer initializer = new(paths);
+        initializer.Initialize();
+
+        QaFolderNameSanitizer folderNameSanitizer = new();
+        QaMetadataService metadataService = new(paths, folderNameSanitizer);
+        IReadOnlyList<QaPmsMetadata> pmsSystems = metadataService.LoadPmsSystems();
+        IReadOnlyList<QaHotelMetadata> hotels = metadataService.LoadHotels();
+
+        return (metadataService, pmsSystems, hotels, paths);
+    }
+
     private void ChangeLogsFolder()
     {
         using FolderBrowserDialog folderBrowserDialog = new()
@@ -418,6 +547,20 @@ public partial class MainForm : Form
             FileName = path,
             UseShellExecute = true
         });
+    }
+
+    private void ShowQaWorkflowError(
+        string title,
+        string message,
+        Exception exception)
+    {
+        Debug.WriteLine(exception);
+        MessageBox.Show(
+            this,
+            message,
+            title,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
     }
 
     private static void ShowError(string message, Exception ex)
