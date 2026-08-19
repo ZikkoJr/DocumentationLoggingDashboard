@@ -5,11 +5,23 @@ namespace DocumentationLoggingDashboard.QAReports.Models;
 /// </summary>
 public sealed class QaReport
 {
-    public const int CurrentSchemaVersion = 1;
+    private string fileId = string.Empty;
+
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
     public string ReportId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the source File ID as text. Surrounding whitespace is
+    /// normalized without parsing the identifier, so leading zeroes remain intact.
+    /// </summary>
+    public string FileId
+    {
+        get => fileId;
+        set => fileId = value?.Trim() ?? string.Empty;
+    }
 
     public QaHotelInformation HotelInformation { get; set; } = new();
 

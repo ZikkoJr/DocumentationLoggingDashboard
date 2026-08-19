@@ -12,7 +12,7 @@ namespace DocumentationLoggingDashboard.QAReports.Validation;
 /// </summary>
 internal static class QaReportReadinessFingerprint
 {
-    private const string FingerprintVersion = "QA-REPORT-READINESS-V1";
+    private const string FingerprintVersion = "QA-REPORT-READINESS-V2";
 
     public static string Compute(QaReport report)
     {
@@ -22,6 +22,7 @@ internal static class QaReportReadinessFingerprint
         AppendString(value, "fingerprintVersion", FingerprintVersion);
         AppendInt(value, "schemaVersion", report.SchemaVersion);
         AppendString(value, "reportId", report.ReportId);
+        AppendString(value, "fileId", report.FileId);
 
         QaHotelInformation? hotel = report.HotelInformation;
         AppendPresence(value, "hotelInformation", hotel is not null);

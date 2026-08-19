@@ -139,6 +139,17 @@ public sealed class QaReportValidationService
         IReadOnlyList<QaHotelMetadata> canonicalHotels,
         ICollection<string> errors)
     {
+        if (report.SchemaVersion != QaReport.CurrentSchemaVersion)
+        {
+            errors.Add(
+                $"Detailed QA report schema version {report.SchemaVersion} is unsupported; expected version {QaReport.CurrentSchemaVersion}.");
+        }
+
+        if (TrimToNull(report.FileId) is null)
+        {
+            errors.Add("File ID is required.");
+        }
+
         QaHotelInformation? hotelInformation = report.HotelInformation;
 
         if (hotelInformation is null)
@@ -447,7 +458,6 @@ public sealed class QaReportValidationService
         ValidateFileMonthStatistics(
             statistics,
             snapshot.BlankById,
-            resultsById,
             errors);
         ValidateMonetaryStatistics(
             statistics,
@@ -618,11 +628,9 @@ public sealed class QaReportValidationService
                 $"Automatic applicable-row count for '{definition.DisplayName}' must equal Total Data Rows.");
         }
 
-        string presenceCheckId = GetPresenceChecklistId(definition.Id);
-        bool missingFieldIsDocumented = resultsById.TryGetValue(
-            presenceCheckId,
-            out QaCheckResult? presenceResult)
-            && presenceResult.Status == QaCheckStatus.Fail;
+        bool missingFieldIsDocumented = IsMissingFieldDocumented(
+            definition.Id,
+            resultsById);
 
         if (totalDataRows > 0
             && statistic.TotalApplicableRows == 0
@@ -736,11 +744,9 @@ public sealed class QaReportValidationService
         {
             long derived = (long)blankStatistic.TotalApplicableRows
                 - blankStatistic.BlankCount;
-            string presenceCheckId = GetPresenceChecklistId(definition.Id);
-            bool missingFieldIsDocumented = resultsById.TryGetValue(
-                    presenceCheckId,
-                    out QaCheckResult? presenceResult)
-                && presenceResult.Status == QaCheckStatus.Fail;
+            bool missingFieldIsDocumented = IsMissingFieldDocumented(
+                definition.Id,
+                resultsById);
 
             if (derived < 0)
             {
@@ -840,7 +846,6 @@ public sealed class QaReportValidationService
     private static void ValidateFileMonthStatistics(
         QaStatistics statistics,
         IReadOnlyDictionary<string, QaBlankValueStatistic> blankById,
-        IReadOnlyDictionary<string, QaCheckResult> resultsById,
         ICollection<string> errors)
     {
         QaFileMonthStatistics? fileMonth = statistics.FileMonth;
@@ -856,6 +861,22 @@ public sealed class QaReportValidationService
             || fileMonth.ArrivalDatesOutsideFileMonth < 0)
         {
             errors.Add("File Month statistic counts cannot be negative.");
+        }
+
+        if (fileMonth.ValidArrivalDateCount >= 0
+            && fileMonth.ArrivalDatesWithinFileMonth >
+                fileMonth.ValidArrivalDateCount)
+        {
+            errors.Add(
+                "Arrival Dates within File Month cannot exceed Valid Arrival Date Count.");
+        }
+
+        if (fileMonth.ValidArrivalDateCount >= 0
+            && fileMonth.ArrivalDatesOutsideFileMonth >
+                fileMonth.ValidArrivalDateCount)
+        {
+            errors.Add(
+                "Arrival Dates outside File Month cannot exceed Valid Arrival Date Count.");
         }
 
         long categorized = (long)fileMonth.ArrivalDatesWithinFileMonth
@@ -891,25 +912,6 @@ public sealed class QaReportValidationService
             {
                 errors.Add(
                     "Valid Arrival Date Count cannot exceed the derived nonblank Arrival Date count.");
-            }
-        }
-
-        if (resultsById.TryGetValue(
-                QaChecklistIds.Raw.ArrivalWithinFileMonth,
-                out QaCheckResult? monthResult))
-        {
-            if (fileMonth.ArrivalDatesOutsideFileMonth > 0
-                && monthResult.Status != QaCheckStatus.Fail)
-            {
-                errors.Add(
-                    "Arrival Dates outside File Month require the File Month checklist item to be Fail.");
-            }
-            else if (fileMonth.ArrivalDatesOutsideFileMonth == 0
-                && monthResult.Status == QaCheckStatus.Fail
-                && TrimToNull(monthResult.Notes) is null)
-            {
-                errors.Add(
-                    "A File Month checklist failure with zero outside dates requires meaningful notes.");
             }
         }
     }
@@ -1386,6 +1388,12 @@ public sealed class QaReportValidationService
                 continue;
             }
 
+            if (QaDetailedAvailabilityRules
+                .SuppressesOrdinaryChecklistFinding(definition.Id))
+            {
+                continue;
+            }
+
             if (result.Status == QaCheckStatus.Fail)
             {
                 if (!ShouldSuppressChecklistFailureForThreshold(
@@ -1424,6 +1432,17 @@ public sealed class QaReportValidationService
                         errors);
                 }
             }
+        }
+
+        foreach (QaFinding availabilityFinding
+                 in QaDetailedAvailabilityRules.CreateExpectedFindings(resultsById))
+        {
+            AddExpected(
+                expected,
+                availabilityFinding.FindingId,
+                availabilityFinding.Severity,
+                availabilityFinding.Source,
+                errors);
         }
 
         if (characteristics?.NameColumnMode == QaNameColumnMode.FullName)
@@ -1517,6 +1536,18 @@ public sealed class QaReportValidationService
 
         if (reportStatistics is not null)
         {
+            if (QaStatisticsCalculationService
+                .ExceedsArrivalOutsideFileMonthFailureThreshold(
+                    reportStatistics.FileMonth))
+            {
+                AddExpected(
+                    expected,
+                    QaFindingIds.ArrivalOutsideFileMonthStatisticFailure,
+                    QaFindingSeverity.Failure,
+                    QaFindingSource.Statistic,
+                    errors);
+            }
+
             if (reportStatistics.UnusualAverageRateValues?.HasUnusualValues == true
                 && reportStatistics.UnusualAverageRateValues.UnusualValueCount > 0)
             {
@@ -1678,6 +1709,8 @@ public sealed class QaReportValidationService
             }
 
             if (result.Status == QaCheckStatus.Fail
+                && !QaDetailedAvailabilityRules
+                    .SuppressesOrdinaryChecklistFinding(definition.Id)
                 && TrimToNull(result.Notes) is null)
             {
                 string failureId = QaFindingIds.FailureForCheck(definition.Id);
@@ -1728,7 +1761,10 @@ public sealed class QaReportValidationService
             QaFindingIds.UnusualStayValueStatisticWarning,
             QaFindingIds.HighStayValueStatisticWarning,
             QaFindingIds.RowDifferenceStatisticWarning,
-            QaFindingIds.RejectedRecordsStatisticWarning
+            QaFindingIds.RejectedRecordsStatisticWarning,
+            QaFindingIds.ArrivalOutsideFileMonthStatisticFailure,
+            QaFindingIds.StrategySourceRateMarketWarning,
+            QaFindingIds.StrategySourceRateMarketFailure
         };
 
         foreach (QaCheckDefinition definition in checklistDefinitions)
@@ -1768,9 +1804,25 @@ public sealed class QaReportValidationService
         }
     }
 
-    private static string GetPresenceChecklistId(string fieldId)
+    private static bool IsMissingFieldDocumented(
+        string fieldId,
+        IReadOnlyDictionary<string, QaCheckResult> resultsById)
     {
-        return fieldId switch
+        if (fieldId == QaStatisticFieldIds.SourceRateMarket)
+        {
+            string[] strategyCheckIds =
+            [
+                QaChecklistIds.Raw.StrategySourceColumnAvailable,
+                QaChecklistIds.Raw.StrategyRateColumnAvailable,
+                QaChecklistIds.Raw.StrategyMarketColumnAvailable
+            ];
+
+            return strategyCheckIds.All(checkId =>
+                resultsById.TryGetValue(checkId, out QaCheckResult? result)
+                && result.Status == QaCheckStatus.Fail);
+        }
+
+        string presenceCheckId = fieldId switch
         {
             QaStatisticFieldIds.FirstName or
             QaStatisticFieldIds.LastName or
@@ -1779,7 +1831,7 @@ public sealed class QaReportValidationService
             QaStatisticFieldIds.ConfirmationNumber =>
                 QaChecklistIds.Raw.RequiredConfirmationPresent,
             QaStatisticFieldIds.Email =>
-                QaChecklistIds.Raw.RequiredEmailPresent,
+                QaChecklistIds.Raw.EmailColumnAvailable,
             QaStatisticFieldIds.ReservationDate =>
                 QaChecklistIds.Raw.RequiredReservationDatePresent,
             QaStatisticFieldIds.ArrivalDate =>
@@ -1789,13 +1841,16 @@ public sealed class QaReportValidationService
             QaStatisticFieldIds.AverageRate or
             QaStatisticFieldIds.StayValue =>
                 QaChecklistIds.Raw.RequiredMonetaryValuePresent,
-            QaStatisticFieldIds.SourceRateMarket =>
-                QaChecklistIds.Raw.SourceColumnPresent,
             _ => throw new ArgumentOutOfRangeException(
                 nameof(fieldId),
                 fieldId,
                 "Unknown statistics field ID.")
         };
+
+        return resultsById.TryGetValue(
+                presenceCheckId,
+                out QaCheckResult? presenceResult)
+            && presenceResult.Status == QaCheckStatus.Fail;
     }
 
     private static bool TryIsChecklistApplicable(

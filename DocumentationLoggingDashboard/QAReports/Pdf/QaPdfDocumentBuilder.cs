@@ -124,6 +124,7 @@ internal sealed class QaPdfDocumentBuilder
             summary,
             "File Month",
             report.HotelInformation.FileMonth!.ToString());
+        AddKeyValueRow(summary, "File ID", report.FileId);
         AddKeyValueRow(
             summary,
             "QA Date",

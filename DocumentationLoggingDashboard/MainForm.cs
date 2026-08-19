@@ -53,7 +53,8 @@ public partial class MainForm : Form
         openLogIndexButton.Click += (_, _) => OpenLogIndex();
         changeLogsFolderButton.Click += (_, _) => ChangeLogsFolder();
         resetDefaultFolderButton.Click += (_, _) => ResetToDefaultFolder();
-        createQaReportButton.Click += (_, _) => OpenQaReport();
+        detailedQaReportButton.Click += (_, _) => OpenDetailedQaReport();
+        quickQaButton.Click += (_, _) => OpenQuickQa();
         manageQaHotelsPmsButton.Click += (_, _) => OpenQaMetadataManagement();
     }
 
@@ -346,7 +347,7 @@ public partial class MainForm : Form
         }
     }
 
-    private void OpenQaReport()
+    private void OpenDetailedQaReport()
     {
         try
         {
@@ -362,21 +363,21 @@ public partial class MainForm : Form
         catch (QaUnsupportedMetadataSchemaException ex)
         {
             ShowQaWorkflowError(
-                "Create QA Report",
+                "Detailed QA Report",
                 "QA metadata uses an unsupported version. The existing metadata files were not changed.",
                 ex);
         }
         catch (QaStorageInitializationException ex)
         {
             ShowQaWorkflowError(
-                "Create QA Report",
+                "Detailed QA Report",
                 "QA storage could not be initialized in the configured documentation folder. Check that the folder is available and writable.",
                 ex);
         }
         catch (QaMetadataException ex)
         {
             ShowQaWorkflowError(
-                "Create QA Report",
+                "Detailed QA Report",
                 "QA metadata could not be loaded because a metadata file is invalid or inaccessible. The existing file was not changed.",
                 ex);
         }
@@ -386,15 +387,68 @@ public partial class MainForm : Form
             or InvalidOperationException)
         {
             ShowQaWorkflowError(
-                "Create QA Report",
+                "Detailed QA Report",
                 "The configured documentation folder could not be used for QA setup.",
                 ex);
         }
         catch (Exception ex)
         {
             ShowQaWorkflowError(
-                "Create QA Report",
-                "The QA report form could not be opened.",
+                "Detailed QA Report",
+                "The Detailed QA Report form could not be opened.",
+                ex);
+        }
+    }
+
+    private void OpenQuickQa()
+    {
+        try
+        {
+            var dependencies = CreateQaWorkflowDependencies();
+
+            using QuickQaForm form = new(
+                dependencies.MetadataService,
+                dependencies.PmsSystems,
+                dependencies.Hotels,
+                dependencies.Paths);
+            form.ShowDialog(this);
+        }
+        catch (QaUnsupportedMetadataSchemaException ex)
+        {
+            ShowQaWorkflowError(
+                "Quick QA",
+                "QA metadata uses an unsupported version. The existing metadata files were not changed.",
+                ex);
+        }
+        catch (QaStorageInitializationException ex)
+        {
+            ShowQaWorkflowError(
+                "Quick QA",
+                "QA storage could not be initialized in the configured documentation folder. Check that the folder is available and writable.",
+                ex);
+        }
+        catch (QaMetadataException ex)
+        {
+            ShowQaWorkflowError(
+                "Quick QA",
+                "QA metadata could not be loaded because a metadata file is invalid or inaccessible. The existing file was not changed.",
+                ex);
+        }
+        catch (Exception ex) when (ex is ArgumentException
+            or NotSupportedException
+            or PathTooLongException
+            or InvalidOperationException)
+        {
+            ShowQaWorkflowError(
+                "Quick QA",
+                "The configured documentation folder could not be used for QA setup.",
+                ex);
+        }
+        catch (Exception ex)
+        {
+            ShowQaWorkflowError(
+                "Quick QA",
+                "The Quick QA form could not be opened.",
                 ex);
         }
     }

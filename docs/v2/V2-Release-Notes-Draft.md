@@ -8,6 +8,8 @@
 
 > **Deferred-text correction:** V2 defers QA report free-text model commits until validation/action boundaries and batches the resulting refresh. Focused 8/8, synthetic PDF/index, actual-125% long-note, and protected V1 evidence pass. Real 100%/150% DPI and independent production-candidate review remain open. See `Pilot-Correction-Deferred-Text-Commit.md`.
 
+> **Post-pilot correction:** The active Detailed catalog now has 29 items after the approved Email, Strategy, and Arrival retirements/replacements. File Month statistics remain visible. Exactly 30% outside does not fail; more than 30% creates one statistics-sourced Failure. Current combined-update evidence is recorded in `../updates/Quick-QA-Test-Matrix.md`; independent approval and any commit/package remain pending.
+
 ## Overview
 
 Version 2 adds a manual QA Report workflow alongside the existing V1 documentation-log workflows. It guides an operator through Hotel/PMS selection, file characteristics, Raw File QA and DB QA checklists, statistics, findings, validation, PDF generation, dual-location saving, and a dedicated QA Report index.
@@ -27,7 +29,7 @@ Metadata editing and deletion are not included in this version.
 
 ### Manual QA entry
 
-- Complete the approved 28-item Raw File QA and DB QA catalog.
+- Complete the approved 29-item active Raw File QA and DB QA catalog: 22 Raw File items and 7 Database items.
 - Apply checklist items dynamically for separate-name columns, a full-name column, currency, one or two monetary columns, rejected records, and always-applicable checks.
 - Record manual statistics, including separate Blank Value Statistics and Broken Data Statistics.
 - Treat Total Data Rows as the operator-entered count of data-bearing rows, excluding headers/preamble; Headers Present and Data Start Row do not cause another subtraction. For 120 occupied physical rows with a row-1 header and data starting on row 2, enter `119`.
@@ -47,6 +49,7 @@ The application does not read a spreadsheet, parse a hotel file, query a databas
 - Preserve the finding's original severity. A handled Failure remains under Failed Checks; when no Active Failure remains, the existing status service calculates Pass with Warnings.
 - Remove stale findings and reset a resolution if its underlying condition disappears and later returns.
 - Use separate deterministic Warning and Failure families for Blank and Broken thresholds. For a mapped Broken result above 50%, blank Notes on the current failing checklist row identify a threshold-only condition and suppress its generic generated checklist Failure. Nonblank checklist Notes document a separate contextual defect, so both the canonical statistics Failure and contextual checklist Failure remain; resolution state alone does not control this decision.
+- Keep File Month statistics visible while retiring the manual Arrival Month checklist row. Exactly 30% or less outside the selected File Month creates no Arrival/File Month finding; more than 30% creates exactly one `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH` Failure from Statistic source with no related checklist ID.
 
 ### Validation and status
 

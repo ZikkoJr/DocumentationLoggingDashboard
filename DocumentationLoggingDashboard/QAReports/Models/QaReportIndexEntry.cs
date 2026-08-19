@@ -18,6 +18,37 @@ public sealed class QaReportIndexEntry
         string relativeHotelCopyPath,
         string relativePmsCopyPath,
         DateTimeOffset savedAt)
+        : this(
+            reportKey,
+            qaDate,
+            hotelName,
+            hotelId,
+            pmsName,
+            fileMonth,
+            fileId: null,
+            status,
+            effectiveCreatedBy,
+            filename,
+            relativeHotelCopyPath,
+            relativePmsCopyPath,
+            savedAt)
+    {
+    }
+
+    public QaReportIndexEntry(
+        QaReportKey reportKey,
+        DateOnly qaDate,
+        string hotelName,
+        string hotelId,
+        string pmsName,
+        QaFileMonth fileMonth,
+        string? fileId,
+        QaReportStatus status,
+        string effectiveCreatedBy,
+        string filename,
+        string relativeHotelCopyPath,
+        string relativePmsCopyPath,
+        DateTimeOffset savedAt)
     {
         ReportKey = reportKey
             ?? throw new ArgumentNullException(nameof(reportKey));
@@ -42,6 +73,7 @@ public sealed class QaReportIndexEntry
         HotelName = RequireValue(hotelName, nameof(hotelName));
         HotelId = RequireValue(hotelId, nameof(hotelId));
         PmsName = RequireValue(pmsName, nameof(pmsName));
+        FileId = NormalizeOptionalValue(fileId, nameof(fileId));
         EffectiveCreatedBy = RequireValue(
             effectiveCreatedBy,
             nameof(effectiveCreatedBy));
@@ -81,6 +113,12 @@ public sealed class QaReportIndexEntry
 
     public QaFileMonth FileMonth { get; }
 
+    /// <summary>
+    /// Gets the File ID recorded by a schema-2 report, or null for a historical
+    /// index entry that predates File ID support.
+    /// </summary>
+    public string? FileId { get; }
+
     public QaReportStatus Status { get; }
 
     public string EffectiveCreatedBy { get; }
@@ -103,6 +141,15 @@ public sealed class QaReportIndexEntry
         }
 
         return value.Trim();
+    }
+
+    private static string? NormalizeOptionalValue(
+        string? value,
+        string parameterName)
+    {
+        return value is null
+            ? null
+            : RequireValue(value, parameterName);
     }
 
     private static string NormalizeRelativePath(

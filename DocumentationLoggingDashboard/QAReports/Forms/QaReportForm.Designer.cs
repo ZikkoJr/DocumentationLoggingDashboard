@@ -29,6 +29,8 @@ partial class QaReportForm
     private TableLayoutPanel reportInformationLayoutPanel;
     private Label fileMonthLabel;
     private DateTimePicker fileMonthPicker;
+    private Label fileIdLabel;
+    private TextBox fileIdTextBox;
     private Label qaDateLabel;
     private DateTimePicker qaDatePicker;
     private Label createdByLabel;
@@ -113,6 +115,8 @@ partial class QaReportForm
         reportInformationLayoutPanel = new TableLayoutPanel();
         fileMonthLabel = new Label();
         fileMonthPicker = new DateTimePicker();
+        fileIdLabel = new Label();
+        fileIdTextBox = new TextBox();
         qaDateLabel = new Label();
         qaDatePicker = new DateTimePicker();
         createdByLabel = new Label();
@@ -283,9 +287,9 @@ partial class QaReportForm
         reportDetailsLayoutPanel.Name = "reportDetailsLayoutPanel";
         reportDetailsLayoutPanel.RowCount = 3;
         reportDetailsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 235F));
-        reportDetailsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 250F));
+        reportDetailsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 286F));
         reportDetailsLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        reportDetailsLayoutPanel.Size = new Size(998, 925);
+        reportDetailsLayoutPanel.Size = new Size(998, 961);
         reportDetailsLayoutPanel.TabIndex = 0;
         //
         // hotelGroupBox
@@ -405,7 +409,7 @@ partial class QaReportForm
         reportInformationGroupBox.Location = new Point(3, 238);
         reportInformationGroupBox.Name = "reportInformationGroupBox";
         reportInformationGroupBox.Padding = new Padding(10);
-        reportInformationGroupBox.Size = new Size(992, 244);
+        reportInformationGroupBox.Size = new Size(992, 280);
         reportInformationGroupBox.TabIndex = 1;
         reportInformationGroupBox.TabStop = false;
         reportInformationGroupBox.Text = "Report Information";
@@ -417,24 +421,27 @@ partial class QaReportForm
         reportInformationLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         reportInformationLayoutPanel.Controls.Add(fileMonthLabel, 0, 0);
         reportInformationLayoutPanel.Controls.Add(fileMonthPicker, 1, 0);
-        reportInformationLayoutPanel.Controls.Add(qaDateLabel, 0, 1);
-        reportInformationLayoutPanel.Controls.Add(qaDatePicker, 1, 1);
-        reportInformationLayoutPanel.Controls.Add(createdByLabel, 0, 2);
-        reportInformationLayoutPanel.Controls.Add(createdByTextBox, 1, 2);
-        reportInformationLayoutPanel.Controls.Add(originalFileNameLabel, 0, 3);
-        reportInformationLayoutPanel.Controls.Add(originalFileNameTextBox, 1, 3);
-        reportInformationLayoutPanel.Controls.Add(generalNotesLabel, 0, 4);
-        reportInformationLayoutPanel.Controls.Add(generalNotesTextBox, 1, 4);
+        reportInformationLayoutPanel.Controls.Add(fileIdLabel, 0, 1);
+        reportInformationLayoutPanel.Controls.Add(fileIdTextBox, 1, 1);
+        reportInformationLayoutPanel.Controls.Add(qaDateLabel, 0, 2);
+        reportInformationLayoutPanel.Controls.Add(qaDatePicker, 1, 2);
+        reportInformationLayoutPanel.Controls.Add(createdByLabel, 0, 3);
+        reportInformationLayoutPanel.Controls.Add(createdByTextBox, 1, 3);
+        reportInformationLayoutPanel.Controls.Add(originalFileNameLabel, 0, 4);
+        reportInformationLayoutPanel.Controls.Add(originalFileNameTextBox, 1, 4);
+        reportInformationLayoutPanel.Controls.Add(generalNotesLabel, 0, 5);
+        reportInformationLayoutPanel.Controls.Add(generalNotesTextBox, 1, 5);
         reportInformationLayoutPanel.Dock = DockStyle.Fill;
         reportInformationLayoutPanel.Location = new Point(10, 26);
         reportInformationLayoutPanel.Name = "reportInformationLayoutPanel";
-        reportInformationLayoutPanel.RowCount = 5;
+        reportInformationLayoutPanel.RowCount = 6;
+        reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
         reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
         reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
         reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
         reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
         reportInformationLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        reportInformationLayoutPanel.Size = new Size(972, 208);
+        reportInformationLayoutPanel.Size = new Size(972, 244);
         reportInformationLayoutPanel.TabIndex = 0;
         //
         // fileMonthLabel
@@ -460,14 +467,35 @@ partial class QaReportForm
         fileMonthPicker.Size = new Size(140, 23);
         fileMonthPicker.TabIndex = 1;
         //
+        // fileIdLabel
+        //
+        fileIdLabel.AutoSize = true;
+        fileIdLabel.Dock = DockStyle.Fill;
+        fileIdLabel.Location = new Point(3, 36);
+        fileIdLabel.Name = "fileIdLabel";
+        fileIdLabel.Size = new Size(144, 36);
+        fileIdLabel.TabIndex = 2;
+        fileIdLabel.Text = "File ID";
+        fileIdLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
+        // fileIdTextBox
+        //
+        fileIdTextBox.AccessibleName = "File ID";
+        fileIdTextBox.Dock = DockStyle.Fill;
+        fileIdTextBox.Location = new Point(153, 42);
+        fileIdTextBox.Margin = new Padding(3, 6, 3, 3);
+        fileIdTextBox.Name = "fileIdTextBox";
+        fileIdTextBox.Size = new Size(816, 23);
+        fileIdTextBox.TabIndex = 3;
+        //
         // qaDateLabel
         //
         qaDateLabel.AutoSize = true;
         qaDateLabel.Dock = DockStyle.Fill;
-        qaDateLabel.Location = new Point(3, 36);
+        qaDateLabel.Location = new Point(3, 72);
         qaDateLabel.Name = "qaDateLabel";
         qaDateLabel.Size = new Size(144, 36);
-        qaDateLabel.TabIndex = 2;
+        qaDateLabel.TabIndex = 4;
         qaDateLabel.Text = "QA Date";
         qaDateLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
@@ -475,20 +503,20 @@ partial class QaReportForm
         //
         qaDatePicker.AccessibleName = "QA date";
         qaDatePicker.Format = DateTimePickerFormat.Short;
-        qaDatePicker.Location = new Point(153, 42);
+        qaDatePicker.Location = new Point(153, 78);
         qaDatePicker.Margin = new Padding(3, 6, 3, 3);
         qaDatePicker.Name = "qaDatePicker";
         qaDatePicker.Size = new Size(140, 23);
-        qaDatePicker.TabIndex = 3;
+        qaDatePicker.TabIndex = 5;
         //
         // createdByLabel
         //
         createdByLabel.AutoSize = true;
         createdByLabel.Dock = DockStyle.Fill;
-        createdByLabel.Location = new Point(3, 72);
+        createdByLabel.Location = new Point(3, 108);
         createdByLabel.Name = "createdByLabel";
         createdByLabel.Size = new Size(144, 36);
-        createdByLabel.TabIndex = 4;
+        createdByLabel.TabIndex = 6;
         createdByLabel.Text = "Created By (optional)";
         createdByLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
@@ -496,20 +524,20 @@ partial class QaReportForm
         //
         createdByTextBox.AccessibleName = "Created by, optional";
         createdByTextBox.Dock = DockStyle.Fill;
-        createdByTextBox.Location = new Point(153, 78);
+        createdByTextBox.Location = new Point(153, 114);
         createdByTextBox.Margin = new Padding(3, 6, 3, 3);
         createdByTextBox.Name = "createdByTextBox";
         createdByTextBox.Size = new Size(816, 23);
-        createdByTextBox.TabIndex = 5;
+        createdByTextBox.TabIndex = 7;
         //
         // originalFileNameLabel
         //
         originalFileNameLabel.AutoSize = true;
         originalFileNameLabel.Dock = DockStyle.Fill;
-        originalFileNameLabel.Location = new Point(3, 108);
+        originalFileNameLabel.Location = new Point(3, 144);
         originalFileNameLabel.Name = "originalFileNameLabel";
         originalFileNameLabel.Size = new Size(144, 36);
-        originalFileNameLabel.TabIndex = 6;
+        originalFileNameLabel.TabIndex = 8;
         originalFileNameLabel.Text = "Original Filename (optional)";
         originalFileNameLabel.TextAlign = ContentAlignment.MiddleLeft;
         //
@@ -517,20 +545,20 @@ partial class QaReportForm
         //
         originalFileNameTextBox.AccessibleName = "Original filename or label, optional";
         originalFileNameTextBox.Dock = DockStyle.Fill;
-        originalFileNameTextBox.Location = new Point(153, 114);
+        originalFileNameTextBox.Location = new Point(153, 150);
         originalFileNameTextBox.Margin = new Padding(3, 6, 3, 3);
         originalFileNameTextBox.Name = "originalFileNameTextBox";
         originalFileNameTextBox.Size = new Size(816, 23);
-        originalFileNameTextBox.TabIndex = 7;
+        originalFileNameTextBox.TabIndex = 9;
         //
         // generalNotesLabel
         //
         generalNotesLabel.AutoSize = true;
         generalNotesLabel.Dock = DockStyle.Fill;
-        generalNotesLabel.Location = new Point(3, 144);
+        generalNotesLabel.Location = new Point(3, 180);
         generalNotesLabel.Name = "generalNotesLabel";
         generalNotesLabel.Size = new Size(144, 64);
-        generalNotesLabel.TabIndex = 8;
+        generalNotesLabel.TabIndex = 10;
         generalNotesLabel.Text = "General Notes (optional)";
         generalNotesLabel.TextAlign = ContentAlignment.TopLeft;
         //
@@ -538,12 +566,12 @@ partial class QaReportForm
         //
         generalNotesTextBox.AccessibleName = "General QA notes, optional";
         generalNotesTextBox.Dock = DockStyle.Fill;
-        generalNotesTextBox.Location = new Point(153, 147);
+        generalNotesTextBox.Location = new Point(153, 183);
         generalNotesTextBox.Multiline = true;
         generalNotesTextBox.Name = "generalNotesTextBox";
         generalNotesTextBox.ScrollBars = ScrollBars.Vertical;
         generalNotesTextBox.Size = new Size(816, 58);
-        generalNotesTextBox.TabIndex = 9;
+        generalNotesTextBox.TabIndex = 11;
         //
         // fileCharacteristicsGroupBox
         //
@@ -551,7 +579,7 @@ partial class QaReportForm
         fileCharacteristicsGroupBox.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         fileCharacteristicsGroupBox.Controls.Add(fileCharacteristicsLayoutPanel);
         fileCharacteristicsGroupBox.Dock = DockStyle.Top;
-        fileCharacteristicsGroupBox.Location = new Point(3, 488);
+        fileCharacteristicsGroupBox.Location = new Point(3, 524);
         fileCharacteristicsGroupBox.Name = "fileCharacteristicsGroupBox";
         fileCharacteristicsGroupBox.Padding = new Padding(10);
         fileCharacteristicsGroupBox.Size = new Size(992, 434);

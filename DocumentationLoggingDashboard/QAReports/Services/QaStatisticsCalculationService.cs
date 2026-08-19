@@ -132,6 +132,35 @@ public sealed class QaStatisticsCalculationService
             : decimal.Round(numerator * 100m / denominator, 2);
     }
 
+    internal static bool HasValidFileMonthCategorization(
+        QaFileMonthStatistics? fileMonth)
+    {
+        if (fileMonth is null
+            || fileMonth.ValidArrivalDateCount < 0
+            || fileMonth.ArrivalDatesWithinFileMonth < 0
+            || fileMonth.ArrivalDatesOutsideFileMonth < 0
+            || fileMonth.ArrivalDatesWithinFileMonth >
+                fileMonth.ValidArrivalDateCount
+            || fileMonth.ArrivalDatesOutsideFileMonth >
+                fileMonth.ValidArrivalDateCount)
+        {
+            return false;
+        }
+
+        long categorized = (long)fileMonth.ArrivalDatesWithinFileMonth
+            + fileMonth.ArrivalDatesOutsideFileMonth;
+        return categorized == fileMonth.ValidArrivalDateCount;
+    }
+
+    internal static bool ExceedsArrivalOutsideFileMonthFailureThreshold(
+        QaFileMonthStatistics? fileMonth)
+    {
+        return HasValidFileMonthCategorization(fileMonth)
+            && fileMonth!.ValidArrivalDateCount > 0
+            && fileMonth.ArrivalDatesOutsideFileMonth * 100m
+                > fileMonth.ValidArrivalDateCount * 30m;
+    }
+
     /// <summary>
     /// Classifies a positive statistic using the unrounded counts so a very small
     /// nonzero percentage cannot disappear when its display rounds to 0.00%.

@@ -80,6 +80,8 @@ public sealed class QaFindingSynchronizationService
         QaCheckResult result = resultsById[checkId];
         bool canSelectWarning = selected
             && result.Status == QaCheckStatus.Pass
+            && !QaDetailedAvailabilityRules
+                .SuppressesOrdinaryChecklistFinding(checkId)
             && QaChecklistApplicabilityEvaluator.IsApplicable(
                 definition,
                 characteristics);
@@ -190,6 +192,12 @@ public sealed class QaFindingSynchronizationService
         {
             QaCheckResult result = resultsById[definition.Id];
 
+            if (QaDetailedAvailabilityRules
+                .SuppressesOrdinaryChecklistFinding(definition.Id))
+            {
+                continue;
+            }
+
             if (result.Status == QaCheckStatus.Fail)
             {
                 if (!ShouldSuppressChecklistFailureForThreshold(
@@ -222,6 +230,12 @@ public sealed class QaFindingSynchronizationService
             }
         }
 
+        foreach (QaFinding availabilityFinding
+                 in QaDetailedAvailabilityRules.CreateExpectedFindings(resultsById))
+        {
+            AddExpected(expectedById, availabilityFinding);
+        }
+
         if (characteristics.NameColumnMode == QaNameColumnMode.FullName)
         {
             AddExpected(expectedById, CreateFullNameWarning());
@@ -245,6 +259,7 @@ public sealed class QaFindingSynchronizationService
         AddExpectedStatisticFindings(
             expectedById,
             statistics,
+            report.HotelInformation?.FileMonth,
             resultsById,
             existingById,
             characteristics,
@@ -340,11 +355,23 @@ public sealed class QaFindingSynchronizationService
     private void AddExpectedStatisticFindings(
         IDictionary<string, QaFinding> expectedById,
         QaStatistics statistics,
+        QaFileMonth? selectedFileMonth,
         IReadOnlyDictionary<string, QaCheckResult> resultsById,
         IReadOnlyDictionary<string, QaFinding> existingById,
         QaFileCharacteristics characteristics,
         bool rejectedRecordsStatisticWarningExpected)
     {
+        if (QaStatisticsCalculationService
+            .ExceedsArrivalOutsideFileMonthFailureThreshold(
+                statistics.FileMonth))
+        {
+            AddExpected(
+                expectedById,
+                CreateArrivalOutsideFileMonthFailure(
+                    selectedFileMonth,
+                    statistics.FileMonth));
+        }
+
         AddExpectedBlankStatisticFindings(
             expectedById,
             statistics,
@@ -609,6 +636,34 @@ public sealed class QaFindingSynchronizationService
                 ? $"High broken-data percentage: {definition.DisplayName}"
                 : $"Broken data found: {definition.DisplayName}",
             Description = AppendExplanation(description, statistic.Explanation),
+            Resolution = QaFindingResolution.Active,
+            Source = QaFindingSource.Statistic
+        };
+    }
+
+    private static QaFinding CreateArrivalOutsideFileMonthFailure(
+        QaFileMonth? selectedFileMonth,
+        QaFileMonthStatistics statistics)
+    {
+        decimal exactOutsidePercentage =
+            statistics.ArrivalDatesOutsideFileMonth
+            * 100m
+            / statistics.ValidArrivalDateCount;
+        string fileMonth = selectedFileMonth?.ToString() ?? "Not selected";
+        string percentage = exactOutsidePercentage.ToString(
+            "0.############################",
+            CultureInfo.InvariantCulture);
+
+        return new QaFinding
+        {
+            FindingId =
+                QaFindingIds.ArrivalOutsideFileMonthStatisticFailure,
+            RelatedCheckId = null,
+            Severity = QaFindingSeverity.Failure,
+            Title =
+                "More than 30% of Arrival Dates are outside the selected File Month",
+            Description =
+                $"Selected File Month: {fileMonth}. Valid Arrival Dates: {statistics.ValidArrivalDateCount}; inside File Month: {statistics.ArrivalDatesWithinFileMonth}; outside File Month: {statistics.ArrivalDatesOutsideFileMonth}; outside percentage: {percentage}%.",
             Resolution = QaFindingResolution.Active,
             Source = QaFindingSource.Statistic
         };
@@ -953,7 +1008,10 @@ public sealed class QaFindingSynchronizationService
             QaFindingIds.UnusualStayValueStatisticWarning,
             QaFindingIds.HighStayValueStatisticWarning,
             QaFindingIds.RowDifferenceStatisticWarning,
-            QaFindingIds.RejectedRecordsStatisticWarning
+            QaFindingIds.RejectedRecordsStatisticWarning,
+            QaFindingIds.ArrivalOutsideFileMonthStatisticFailure,
+            QaFindingIds.StrategySourceRateMarketWarning,
+            QaFindingIds.StrategySourceRateMarketFailure
         };
 
         foreach (QaCheckDefinition definition in checklistDefinitions)

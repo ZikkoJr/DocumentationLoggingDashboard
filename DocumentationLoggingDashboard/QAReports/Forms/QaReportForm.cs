@@ -13,7 +13,6 @@ namespace DocumentationLoggingDashboard.QAReports.Forms;
 /// </summary>
 public partial class QaReportForm : Form
 {
-    private const int ExpectedChecklistDefinitionCount = 28;
     private const int MaximumOverwriteFilenamesPerLocation = 3;
     private const int MaximumDisplayedFilenameLength = 100;
     private const int DisplayedFilenameSuffixLength = 30;
@@ -141,10 +140,10 @@ public partial class QaReportForm : Form
     {
         ArgumentNullException.ThrowIfNull(definitions);
 
-        if (definitions.Count != ExpectedChecklistDefinitionCount)
+        if (definitions.Count != QaChecklistCatalog.ExpectedDefinitionCount)
         {
             throw new InvalidOperationException(
-                $"The QA checklist catalog must contain exactly {ExpectedChecklistDefinitionCount} definitions for the QA report form.");
+                $"The QA checklist catalog must contain exactly {QaChecklistCatalog.ExpectedDefinitionCount} definitions for the QA report form.");
         }
 
         HashSet<string> definitionIds = new(StringComparer.Ordinal);
@@ -229,6 +228,7 @@ public partial class QaReportForm : Form
 
         fileMonthPicker.ValueChanged += (_, _) => SynchronizeFileMonth();
         qaDatePicker.ValueChanged += (_, _) => SynchronizeQaDate();
+        WireDeferredReportTextBox(fileIdTextBox);
         WireDeferredReportTextBox(createdByTextBox);
         WireDeferredReportTextBox(originalFileNameTextBox);
         WireDeferredReportTextBox(generalNotesTextBox);
@@ -309,6 +309,14 @@ public partial class QaReportForm : Form
         }
 
         string? value = TrimToNull(textBox.Text);
+
+        if (ReferenceEquals(textBox, fileIdTextBox))
+        {
+            return ApplyReportTextValue(
+                CurrentReport.FileId,
+                value,
+                committed => CurrentReport.FileId = committed ?? string.Empty);
+        }
 
         if (ReferenceEquals(textBox, createdByTextBox))
         {
@@ -452,6 +460,12 @@ public partial class QaReportForm : Form
         CurrentReport.HotelInformation.FileMonth = new QaFileMonth(
             fileMonthPicker.Value.Year,
             fileMonthPicker.Value.Month);
+
+        if (!isInitializingPhase7)
+        {
+            SynchronizeFindingsAndRefreshUi();
+        }
+
         InvalidateReportReadiness();
     }
 
@@ -579,6 +593,12 @@ public partial class QaReportForm : Form
             };
 
             itemControl.Bind(definition, result);
+            if (QaDetailedAvailabilityRules.UsesAvailabilityPresentation(
+                    definition.Id))
+            {
+                itemControl.UseAvailabilityPresentation();
+            }
+
             itemControl.ResultChanged += ChecklistItemControl_ResultChanged;
             targetPanel.Controls.Add(itemControl);
 
@@ -1296,6 +1316,7 @@ public partial class QaReportForm : Form
         [
             "The QA report was saved successfully.",
             string.Empty,
+            $"File ID: {CurrentReport.FileId}",
             $"Filename: {result.FinalFilename}",
             $"Hotel copy: {result.HotelCopyPath}",
             $"PMS copy: {result.PmsCopyPath}",

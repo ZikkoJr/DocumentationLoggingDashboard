@@ -12,6 +12,8 @@ Phase 9 must call the renderer exactly once for a ready report and reuse the sam
 
 > **Deferred-text boundary:** The final P2 correction flushes every pending report, checklist, finding, and statistics text draft before readiness and save. Five focused paired-save cases confirmed that the final character reached the PDF, the Hotel/PMS copies remained byte-identical, and rendered long text remained readable. No PDF format changed. Exact markers, hashes, and final evidence are in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
 
+> **Arrival Month pilot correction:** Newly generated PDFs retain the File Month Statistics rows but omit the retired `RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH` checklist row. Above 30%, the one statistics-sourced `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH` finding appears in Failed Checks; exactly 30% or lower produces no Arrival/File Month finding. A handled occurrence remains Failure severity and stays in Failed Checks. The existing layout, ordering, typography, pagination, and paired-byte reuse are unchanged. See `Pilot-Correction-Arrival-Month-Threshold.md`.
+
 ## Repository baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -104,7 +106,7 @@ Before rendering, the service rejects:
 - blank Effective Created By;
 - missing or stale readiness fingerprint;
 - invalid characteristic/check/finding enum values;
-- Not Evaluated, duplicate, unknown, missing, or applicability-inconsistent checklist results;
+- Not Evaluated, duplicate, arbitrary unknown, missing, or applicability-inconsistent active checklist results;
 - blank or duplicate finding IDs; and
 - missing, duplicate, unknown, or applicability-inconsistent statistics rows and missing required statistics groups.
 
@@ -138,9 +140,9 @@ Information and Statistics contains:
 
 Percentages use the stored corrected values and render as `0.00%`; the PDF layer does not recalculate them. Readiness and its fingerprint prove that counts, displayed denominators, percentages, finding IDs, severities, and modes were synchronized before rendering.
 
-Raw File QA and DB QA iterate the actual immutable `QaChecklistCatalog` in catalog and section order. The input gate requires exactly one result for every definition. Pass and Fail render directly, Not Applicable renders as `N/A` with an explanatory detail, and Not Evaluated is refused. Table heading rows repeat after page breaks.
+Raw File QA and DB QA iterate the actual immutable active `QaChecklistCatalog` in catalog and section order. The input gate requires exactly one result for every active definition. The retired Arrival Month stable ID is not a definition, is not required, and does not render. Because the application does not reload serialized `QaReport` drafts, there is no legacy result to tolerate at this boundary; arbitrary unknown IDs remain invalid. Pass and Fail render directly, Not Applicable renders as `N/A` with an explanatory detail, and Not Evaluated is refused. Table heading rows repeat after page breaks.
 
-Warnings and Failed Checks are filtered strictly by original severity, then deterministically ordered. Corrected Blank/Broken results greater than 0% through 50%, inclusive, appear under Warnings; results above 50% appear under Failed Checks. Resolution never changes placement: handled Warnings remain under Warnings, while handled Failures remain under Failed Checks even when the overall status is Pass with Warnings. Finding blocks show severity/resolution, title, description, related check where available, source, resolution, optional script name, and optional resolution notes.
+Warnings and Failed Checks are filtered strictly by original severity, then deterministically ordered. Corrected Blank/Broken results greater than 0% through 50%, inclusive, appear under Warnings; results above 50% appear under Failed Checks. The Arrival Month statistics Failure appears under Failed Checks only when the exact outside ratio exceeds 30%; no corresponding Warning is rendered at or below 30%. Resolution never changes placement: handled Warnings remain under Warnings, while handled Failures remain under Failed Checks even when the overall status is Pass with Warnings. Finding blocks show severity/resolution, title, description, related check where available, source, resolution, optional script name, and optional resolution notes.
 
 Finding order is catalog-related findings first in checklist order, then statistics findings by stable statistic group/field order, then other generated findings, then manual findings, with stable finding ID tie-breaking. The statistic-order path recognizes `WARN` and `FAIL` variants for both Blank and Broken families. For a mapped greater-than-50% Broken condition, blank Notes on the current failing checklist result identify the threshold-only path, so the PDF renders the canonical statistics Failure without a generic checklist finding. Nonblank checklist Notes document a separate contextual defect, so the PDF renders both Failures. Resolution state alone does not determine which path is rendered.
 

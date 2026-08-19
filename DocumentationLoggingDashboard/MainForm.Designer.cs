@@ -19,7 +19,8 @@ partial class MainForm
     private Label logTypeLabel;
     private ComboBox logTypeComboBox;
     private FlowLayoutPanel qaActionFlowLayoutPanel;
-    private Button createQaReportButton;
+    private Button detailedQaReportButton;
+    private Button quickQaButton;
     private Button manageQaHotelsPmsButton;
     private SplitContainer contentSplitContainer;
     private Panel fieldsScrollPanel;
@@ -67,7 +68,8 @@ partial class MainForm
         logTypeLabel = new Label();
         logTypeComboBox = new ComboBox();
         qaActionFlowLayoutPanel = new FlowLayoutPanel();
-        createQaReportButton = new Button();
+        detailedQaReportButton = new Button();
+        quickQaButton = new Button();
         manageQaHotelsPmsButton = new Button();
         contentSplitContainer = new SplitContainer();
         fieldsScrollPanel = new Panel();
@@ -244,7 +246,8 @@ partial class MainForm
         // qaActionFlowLayoutPanel
         //
         qaActionFlowLayoutPanel.Controls.Add(manageQaHotelsPmsButton);
-        qaActionFlowLayoutPanel.Controls.Add(createQaReportButton);
+        qaActionFlowLayoutPanel.Controls.Add(quickQaButton);
+        qaActionFlowLayoutPanel.Controls.Add(detailedQaReportButton);
         qaActionFlowLayoutPanel.Dock = DockStyle.Fill;
         qaActionFlowLayoutPanel.FlowDirection = FlowDirection.RightToLeft;
         qaActionFlowLayoutPanel.Location = new Point(352, 0);
@@ -254,23 +257,33 @@ partial class MainForm
         qaActionFlowLayoutPanel.TabIndex = 2;
         qaActionFlowLayoutPanel.WrapContents = false;
         //
-        // createQaReportButton
+        // detailedQaReportButton
         //
-        createQaReportButton.Location = new Point(371, 4);
-        createQaReportButton.Margin = new Padding(3, 4, 3, 3);
-        createQaReportButton.Name = "createQaReportButton";
-        createQaReportButton.Size = new Size(150, 30);
-        createQaReportButton.TabIndex = 0;
-        createQaReportButton.Text = "Create QA Report";
-        createQaReportButton.UseVisualStyleBackColor = true;
+        detailedQaReportButton.Location = new Point(335, 4);
+        detailedQaReportButton.Margin = new Padding(3, 4, 3, 3);
+        detailedQaReportButton.Name = "detailedQaReportButton";
+        detailedQaReportButton.Size = new Size(160, 30);
+        detailedQaReportButton.TabIndex = 1;
+        detailedQaReportButton.Text = "Detailed QA Report";
+        detailedQaReportButton.UseVisualStyleBackColor = true;
+        //
+        // quickQaButton
+        //
+        quickQaButton.Location = new Point(501, 4);
+        quickQaButton.Margin = new Padding(3, 4, 3, 3);
+        quickQaButton.Name = "quickQaButton";
+        quickQaButton.Size = new Size(100, 30);
+        quickQaButton.TabIndex = 0;
+        quickQaButton.Text = "Quick QA";
+        quickQaButton.UseVisualStyleBackColor = true;
         //
         // manageQaHotelsPmsButton
         //
-        manageQaHotelsPmsButton.Location = new Point(527, 4);
+        manageQaHotelsPmsButton.Location = new Point(607, 4);
         manageQaHotelsPmsButton.Margin = new Padding(3, 4, 3, 3);
         manageQaHotelsPmsButton.Name = "manageQaHotelsPmsButton";
         manageQaHotelsPmsButton.Size = new Size(180, 30);
-        manageQaHotelsPmsButton.TabIndex = 1;
+        manageQaHotelsPmsButton.TabIndex = 2;
         manageQaHotelsPmsButton.Text = "Manage QA Hotels / PMS";
         manageQaHotelsPmsButton.UseVisualStyleBackColor = true;
         // 

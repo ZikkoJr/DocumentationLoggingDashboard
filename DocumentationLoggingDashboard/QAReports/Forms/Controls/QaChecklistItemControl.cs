@@ -9,9 +9,11 @@ namespace DocumentationLoggingDashboard.QAReports.Forms.Controls;
 public partial class QaChecklistItemControl : UserControl
 {
     private QaCheckResult? boundResult;
+    private string boundDisplayName = string.Empty;
     private bool hasPendingNotesEdit;
     private bool isApplicable;
     private bool isSynchronizing;
+    private bool allowsPassedWarning = true;
 
     public QaChecklistItemControl()
     {
@@ -75,6 +77,7 @@ public partial class QaChecklistItemControl : UserControl
         }
 
         CheckId = definition.Id;
+        boundDisplayName = definition.DisplayName;
         boundResult = result;
         if (bindingChanged)
         {
@@ -102,6 +105,28 @@ public partial class QaChecklistItemControl : UserControl
     }
 
     /// <summary>
+    /// Presents the existing Pass/Fail states as Available/Unavailable and removes
+    /// the ordinary passed-check warning choice. Aggregate availability rules remain
+    /// authoritative in the finding synchronization service.
+    /// </summary>
+    public void UseAvailabilityPresentation()
+    {
+        allowsPassedWarning = false;
+        passRadioButton.Text = "Available";
+        failRadioButton.Text = "Unavailable";
+        passRadioButton.AccessibleName = $"Available: {boundDisplayName}";
+        failRadioButton.AccessibleName = $"Unavailable: {boundDisplayName}";
+        warningFoundCheckBox.Visible = false;
+        warningExplanationNeededLabel.Visible = false;
+        SetWarningFoundCore(warningFound: false);
+
+        if (boundResult is not null)
+        {
+            SynchronizeFromResult();
+        }
+    }
+
+    /// <summary>
     /// Commits the final normalized note and raises at most one logical result
     /// change event.
     /// </summary>
@@ -118,7 +143,9 @@ public partial class QaChecklistItemControl : UserControl
     {
         QaCheckResult result = GetBoundResult();
         bool canSelectWarning =
-            isApplicable && result.Status == QaCheckStatus.Pass;
+            allowsPassedWarning
+            && isApplicable
+            && result.Status == QaCheckStatus.Pass;
 
         SetWarningFoundCore(warningFound && canSelectWarning);
     }
@@ -199,7 +226,9 @@ public partial class QaChecklistItemControl : UserControl
         bool pendingTextChanged =
             CommitPendingTextEditsCore(raiseResultChanged: false);
 
-        if (!isApplicable || boundResult.Status != QaCheckStatus.Pass)
+        if (!allowsPassedWarning
+            || !isApplicable
+            || boundResult.Status != QaCheckStatus.Pass)
         {
             SetWarningFoundCore(warningFound: false);
 
@@ -288,7 +317,9 @@ public partial class QaChecklistItemControl : UserControl
             }
 
             bool canSelectWarning =
-                isApplicable && result.Status == QaCheckStatus.Pass;
+                allowsPassedWarning
+                && isApplicable
+                && result.Status == QaCheckStatus.Pass;
 
             if (!canSelectWarning)
             {
@@ -296,6 +327,7 @@ public partial class QaChecklistItemControl : UserControl
             }
 
             warningFoundCheckBox.Enabled = canSelectWarning;
+            warningFoundCheckBox.Visible = allowsPassedWarning;
             notesTextBox.Enabled = isApplicable;
             resultFlowLayoutPanel.Enabled = isApplicable;
             Enabled = isApplicable;
@@ -327,7 +359,8 @@ public partial class QaChecklistItemControl : UserControl
     private void UpdateWarningExplanationState()
     {
         warningExplanationNeededLabel.Visible =
-            warningFoundCheckBox.Checked
+            allowsPassedWarning
+            && warningFoundCheckBox.Checked
             && string.IsNullOrWhiteSpace(notesTextBox.Text);
     }
 

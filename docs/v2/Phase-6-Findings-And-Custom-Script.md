@@ -10,6 +10,8 @@ This phase remains an incomplete draft workflow. It does not calculate report st
 
 > **Deferred-text pilot correction:** Finding Custom Script Name and Resolution Notes now remain control-local drafts while typing. `Validated`, resolution transitions, readiness/save, tab/workflow transitions, and form closing flush the normalized value. Same-ID refreshes do not overwrite a dirty draft, and a multi-finding action flush performs one final synchronization/refresh. Resolution/severity/ID and approved clearing rules are unchanged. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
 
+> **Arrival Month pilot correction:** The same synchronization service now owns `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH`. It is desired only when internally valid File Month statistics show more than 30% of valid nonblank Arrival Dates outside the selected month. The retired checklist ID creates no generic checklist Failure. Continuous validity preserves resolution; removal clears the finding and its custom-script state, so a later recurrence starts Active. See `Pilot-Correction-Arrival-Month-Threshold.md`.
+
 The corrected statistic finding families are:
 
 ```text
@@ -214,7 +216,7 @@ The form uses one guarded refresh boundary to:
 2. reconstruct checklist Warning checkboxes from deterministic finding presence; and
 3. reconcile the Warnings and Failed Checks controls.
 
-The same guard suppresses recursive checkbox, text, applicability, and finding-row refresh events. Applicability changes are batched across all 28 catalog controls before one final finding refresh.
+The same guard suppresses recursive checkbox, text, applicability, and finding-row refresh events. Applicability changes are batched across all 29 active catalog controls before one final finding refresh.
 
 ## Privacy and in-memory-only behavior
 
@@ -271,7 +273,7 @@ The harness directly verified:
 
 - deterministic helper output and blank-ID rejection;
 - duplicate and blank existing finding rejection;
-- the exact 28-result catalog contract;
+- the historical then-active 28-result catalog contract;
 - Failure generation, fallback/notes descriptions, identity reuse, handled preservation, stale removal, and Active recreation;
 - passed-check Warning creation/removal, Pass preservation, blank explanations, notes descriptions, and Warning-to-Failure replacement;
 - all three characteristic warnings, exact related IDs, no automatic Fail, stale removal, and Active recreation;
@@ -298,7 +300,7 @@ Source and diff review confirms:
 - Hotel/PMS search, real metadata binding, canonical PMS selection, and metadata refresh remain unchanged;
 - the QA Report action and owned form construction remain unchanged;
 - File Month and QA Date remain independent;
-- all 28 Phase 5 results and dynamic applicability transitions remain;
+- all then-active 28 Phase 5 results and dynamic applicability transitions remained at that historical checkpoint; the current post-pilot catalog has 29 active results after the approved retirements and replacements;
 - Pass/Fail still mutates the actual results and Manual result source remains;
 - Close and Escape remain nonblocking and have no persistence path;
 - no event handler is subscribed in both designer and code;

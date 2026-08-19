@@ -22,6 +22,7 @@ public sealed class QaStorageInitializer
             Directory.CreateDirectory(paths.QaReportsRootPath);
             Directory.CreateDirectory(paths.ByHotelRootPath);
             Directory.CreateDirectory(paths.ByPmsRootPath);
+            Directory.CreateDirectory(paths.SurfaceQaRootPath);
             Directory.CreateDirectory(paths.MetadataRootPath);
             Directory.CreateDirectory(paths.IndexRootPath);
 

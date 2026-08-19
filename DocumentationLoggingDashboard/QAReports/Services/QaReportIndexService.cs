@@ -11,8 +11,29 @@ namespace DocumentationLoggingDashboard.QAReports.Services;
 public sealed class QaReportIndexService
 {
     private const string EntrySeparator = "---";
-    private const int EntryLineCount = 13;
     private const int MaximumFilenameLength = 240;
+
+    private static readonly string[] RequiredFieldLabels =
+    [
+        "ReportKey",
+        "QA Date",
+        "Hotel",
+        "Hotel ID",
+        "PMS",
+        "File Month",
+        "Status",
+        "Created By",
+        "Filename",
+        "Hotel Copy",
+        "PMS Copy",
+        "Saved At UTC"
+    ];
+    private static readonly HashSet<string> KnownFieldLabels = new(
+        RequiredFieldLabels,
+        StringComparer.Ordinal)
+    {
+        "File ID"
+    };
 
     private static readonly UTF8Encoding Utf8NoBom = new(
         encoderShouldEmitUTF8Identifier: false,
@@ -152,22 +173,30 @@ public sealed class QaReportIndexService
             lines = lines[..^1];
         }
 
-        if (lines.Length == 0 || lines.Length % EntryLineCount != 0)
+        if (lines.Length == 0)
         {
             throw Malformed("The index does not contain complete entry blocks.");
         }
 
         List<QaReportIndexEntry> entries = [];
         HashSet<QaReportKey> reportKeys = [];
+        List<string> entryLines = [];
+        int entryNumber = 1;
 
-        for (int lineIndex = 0;
-             lineIndex < lines.Length;
-             lineIndex += EntryLineCount)
+        foreach (string line in lines)
         {
-            int entryNumber = (lineIndex / EntryLineCount) + 1;
-            QaReportIndexEntry entry = ParseEntry(
-                lines.AsSpan(lineIndex, EntryLineCount),
-                entryNumber);
+            if (!string.Equals(line, EntrySeparator, StringComparison.Ordinal))
+            {
+                entryLines.Add(line);
+                continue;
+            }
+
+            if (entryLines.Count == 0)
+            {
+                throw Malformed($"Entry {entryNumber} is empty.");
+            }
+
+            QaReportIndexEntry entry = ParseEntry(entryLines, entryNumber);
 
             if (!reportKeys.Add(entry.ReportKey))
             {
@@ -176,47 +205,70 @@ public sealed class QaReportIndexService
             }
 
             entries.Add(entry);
+            entryLines.Clear();
+            entryNumber++;
+        }
+
+        if (entryLines.Count != 0)
+        {
+            throw Malformed($"Entry {entryNumber} has no valid block terminator.");
+        }
+
+        if (entries.Count == 0)
+        {
+            throw Malformed("The index does not contain a complete entry block.");
         }
 
         return entries.ToArray();
     }
 
     private QaReportIndexEntry ParseEntry(
-        ReadOnlySpan<string> lines,
+        IReadOnlyList<string> lines,
         int entryNumber)
     {
-        if (!string.Equals(
-                lines[EntryLineCount - 1],
-                EntrySeparator,
-                StringComparison.Ordinal))
+        Dictionary<string, string> fields = new(StringComparer.Ordinal);
+
+        foreach (string line in lines)
         {
-            throw Malformed($"Entry {entryNumber} has no valid block terminator.");
+            KeyValuePair<string, string> field = ParseFieldLine(
+                line,
+                entryNumber);
+
+            if (!KnownFieldLabels.Contains(field.Key))
+            {
+                throw Malformed(
+                    $"Entry {entryNumber} contains unexpected field '{field.Key}'.");
+            }
+
+            if (!fields.TryAdd(field.Key, field.Value))
+            {
+                throw Malformed(
+                    $"Entry {entryNumber} duplicates field '{field.Key}'.");
+            }
         }
 
-        string reportKeyText = ParseField(lines[0], "ReportKey", entryNumber);
-        string qaDateText = ParseField(lines[1], "QA Date", entryNumber);
-        string hotelName = ParseField(lines[2], "Hotel", entryNumber);
-        string hotelId = ParseField(lines[3], "Hotel ID", entryNumber);
-        string pmsName = ParseField(lines[4], "PMS", entryNumber);
-        string fileMonthText = ParseField(lines[5], "File Month", entryNumber);
-        string statusText = ParseField(lines[6], "Status", entryNumber);
-        string effectiveCreatedBy = ParseField(
-            lines[7],
-            "Created By",
-            entryNumber);
-        string filename = ParseField(lines[8], "Filename", entryNumber);
-        string relativeHotelPath = ParseField(
-            lines[9],
-            "Hotel Copy",
-            entryNumber);
-        string relativePmsPath = ParseField(
-            lines[10],
-            "PMS Copy",
-            entryNumber);
-        string savedAtText = ParseField(
-            lines[11],
-            "Saved At UTC",
-            entryNumber);
+        foreach (string requiredLabel in RequiredFieldLabels)
+        {
+            if (!fields.ContainsKey(requiredLabel))
+            {
+                throw Malformed(
+                    $"Entry {entryNumber} is missing required field '{requiredLabel}'.");
+            }
+        }
+
+        string reportKeyText = fields["ReportKey"];
+        string qaDateText = fields["QA Date"];
+        string hotelName = fields["Hotel"];
+        string hotelId = fields["Hotel ID"];
+        string pmsName = fields["PMS"];
+        string fileMonthText = fields["File Month"];
+        fields.TryGetValue("File ID", out string? fileId);
+        string statusText = fields["Status"];
+        string effectiveCreatedBy = fields["Created By"];
+        string filename = fields["Filename"];
+        string relativeHotelPath = fields["Hotel Copy"];
+        string relativePmsPath = fields["PMS Copy"];
+        string savedAtText = fields["Saved At UTC"];
 
         if (!QaReportKey.TryParse(reportKeyText, out QaReportKey? reportKey))
         {
@@ -291,6 +343,7 @@ public sealed class QaReportIndexService
                 hotelId,
                 pmsName,
                 fileMonth,
+                fileId,
                 status,
                 effectiveCreatedBy,
                 filename,
@@ -308,22 +361,24 @@ public sealed class QaReportIndexService
         }
     }
 
-    private string ParseField(
+    private KeyValuePair<string, string> ParseFieldLine(
         string line,
-        string label,
         int entryNumber)
     {
-        string prefix = label + ": ";
+        int separatorIndex = line.IndexOf(": ", StringComparison.Ordinal);
 
-        if (!line.StartsWith(prefix, StringComparison.Ordinal))
+        if (separatorIndex <= 0)
         {
             throw Malformed(
-                $"Entry {entryNumber} does not have the expected '{label}' field.");
+                $"Entry {entryNumber} contains a malformed field line.");
         }
 
-        string value = line[prefix.Length..];
+        string label = line[..separatorIndex];
+        string value = line[(separatorIndex + 2)..];
 
-        if (string.IsNullOrWhiteSpace(value)
+        if (!string.Equals(label, label.Trim(), StringComparison.Ordinal)
+            || ContainsForbiddenSingleLineCharacter(label)
+            || string.IsNullOrWhiteSpace(value)
             || !string.Equals(value, value.Trim(), StringComparison.Ordinal)
             || ContainsForbiddenSingleLineCharacter(value))
         {
@@ -331,7 +386,7 @@ public sealed class QaReportIndexService
                 $"Entry {entryNumber} has an invalid '{label}' value.");
         }
 
-        return value;
+        return new KeyValuePair<string, string>(label, value);
     }
 
     private QaReportIndexEntry NormalizeEntryForWrite(QaReportIndexEntry entry)
@@ -341,6 +396,9 @@ public sealed class QaReportIndexService
             string hotelName = NormalizeRequiredSingleLine(entry.HotelName);
             string hotelId = NormalizeRequiredSingleLine(entry.HotelId);
             string pmsName = NormalizeRequiredSingleLine(entry.PmsName);
+            string? fileId = entry.FileId is null
+                ? null
+                : NormalizeRequiredSingleLine(entry.FileId);
             string effectiveCreatedBy = NormalizeRequiredSingleLine(
                 entry.EffectiveCreatedBy);
             string filename = NormalizeRequiredSingleLine(entry.Filename);
@@ -391,6 +449,7 @@ public sealed class QaReportIndexService
                 hotelId,
                 pmsName,
                 entry.FileMonth,
+                fileId,
                 entry.Status,
                 effectiveCreatedBy,
                 filename,
@@ -428,6 +487,11 @@ public sealed class QaReportIndexService
             AppendField(builder, "Hotel ID", entry.HotelId);
             AppendField(builder, "PMS", entry.PmsName);
             AppendField(builder, "File Month", entry.FileMonth.ToString());
+            if (entry.FileId is not null)
+            {
+                AppendField(builder, "File ID", entry.FileId);
+            }
+
             AppendField(builder, "Status", FormatStatus(entry.Status));
             AppendField(builder, "Created By", entry.EffectiveCreatedBy);
             AppendField(builder, "Filename", entry.Filename);

@@ -17,18 +17,65 @@ internal static class Program
             }
 
             int geometryResult = options.SemanticOnly
+                || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaStatisticsControlGeometryTests.RunAll(Console.Out);
             int semanticResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaBlankBrokenStatisticsRegressionTests.RunAll(Console.Out);
+            int detailedPostPilotResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QaDetailedPostPilotRegressionTests.RunAll(Console.Out);
+            int quickCoreResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QuickQaCoreRegressionTests.RunAll(Console.Out);
+            int quickFilenamePreferencesResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QuickQaFilenamePreferencesRegressionTests.RunAll(
+                    Console.Out);
+            int quickWorkbookSaveResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QuickQaWorkbookSaveRegressionTests.RunAll(Console.Out);
+            int quickFormMainFormResult = options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QuickQaFormMainFormRegressionTests.RunAll(Console.Out);
+            int arrivalMonthResult = options.GeometryOnly
+                || options.SemanticOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly
+                ? 0
+                : QaArrivalMonthRegressionTests.RunAll(
+                    Console.Out,
+                    options.SaveEvidenceDirectory);
             int saveEvidenceResult = options.GeometryOnly
+                || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
                 || options.VisibleSmoke
@@ -38,18 +85,26 @@ internal static class Program
                     options.SaveEvidenceDirectory);
             int deferredTextResult = options.GeometryOnly
                 || options.SemanticOnly
+                || options.ArrivalMonthOnly
                 || options.V1Only
                 || options.VisibleSmoke
                     ? 0
                     : QaDeferredTextCommitRegressionTests.RunAll(Console.Out);
             int v1Result = options.GeometryOnly
                 || options.SemanticOnly
+                || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.VisibleSmoke
                     ? 0
                     : V1SyntheticRegressionTests.RunAll(Console.Out);
             int result = geometryResult == 0
                 && semanticResult == 0
+                && detailedPostPilotResult == 0
+                && quickCoreResult == 0
+                && quickFilenamePreferencesResult == 0
+                && quickWorkbookSaveResult == 0
+                && quickFormMainFormResult == 0
+                && arrivalMonthResult == 0
                 && saveEvidenceResult == 0
                 && deferredTextResult == 0
                 && v1Result == 0
@@ -81,7 +136,8 @@ internal static class Program
     {
         writer.WriteLine(
             "Usage: dotnet run --project tests/DocumentationLoggingDashboard.GeometryTests " +
-            "[--geometry-only | --semantic-only | --deferred-only | --v1-only] " +
+            "[--geometry-only | --semantic-only | --arrival-month-only | " +
+            "--deferred-only | --v1-only] " +
             "[--save-evidence-dir <absolute-external-parent>] " +
             "[(--visible-smoke | --visible-smoke-only) " +
             "--screenshot-dir <absolute-external-directory>]");
@@ -99,6 +155,7 @@ internal sealed record GeometryTestOptions(
     bool ShowHelp,
     bool GeometryOnly,
     bool SemanticOnly,
+    bool ArrivalMonthOnly,
     bool DeferredOnly,
     bool V1Only,
     string? SaveEvidenceDirectory)
@@ -110,6 +167,7 @@ internal sealed record GeometryTestOptions(
         bool showHelp = false;
         bool geometryOnly = false;
         bool semanticOnly = false;
+        bool arrivalMonthOnly = false;
         bool deferredOnly = false;
         bool v1Only = false;
         string? screenshotDirectory = null;
@@ -131,6 +189,9 @@ internal sealed record GeometryTestOptions(
                     break;
                 case "--semantic-only":
                     semanticOnly = true;
+                    break;
+                case "--arrival-month-only":
+                    arrivalMonthOnly = true;
                     break;
                 case "--deferred-only":
                     deferredOnly = true;
@@ -165,17 +226,25 @@ internal sealed record GeometryTestOptions(
 
         if ((geometryOnly ? 1 : 0)
             + (semanticOnly ? 1 : 0)
+            + (arrivalMonthOnly ? 1 : 0)
             + (deferredOnly ? 1 : 0)
             + (v1Only ? 1 : 0) > 1)
         {
             throw new ArgumentException(
-                "--geometry-only, --semantic-only, --deferred-only, and --v1-only cannot be combined.");
+                "--geometry-only, --semantic-only, --arrival-month-only, " +
+                "--deferred-only, and --v1-only cannot be combined.");
         }
 
         if (visibleSmoke && semanticOnly)
         {
             throw new ArgumentException(
                 "Visible smoke mode requires the geometry harness.");
+        }
+
+        if (visibleSmoke && arrivalMonthOnly)
+        {
+            throw new ArgumentException(
+                "Visible smoke mode cannot be combined with --arrival-month-only.");
         }
 
         if (visibleSmoke && deferredOnly)
@@ -221,6 +290,7 @@ internal sealed record GeometryTestOptions(
             showHelp,
             geometryOnly,
             semanticOnly,
+            arrivalMonthOnly,
             deferredOnly,
             v1Only,
             saveEvidenceDirectory);

@@ -7,6 +7,8 @@ namespace DocumentationLoggingDashboard.QAReports.Definitions;
 /// </summary>
 public static class QaChecklistCatalog
 {
+    public const int ExpectedDefinitionCount = 29;
+
     private static readonly IReadOnlyList<QaCheckDefinition> AllDefinitions =
     [
         Definition(
@@ -22,9 +24,9 @@ public static class QaChecklistCatalog
             QaChecklistSection.RawFile,
             QaCheckApplicability.Always),
         Definition(
-            QaChecklistIds.Raw.RequiredEmailPresent,
-            "Email field is present",
-            "Confirms that the raw file includes an Email field.",
+            QaChecklistIds.Raw.EmailColumnAvailable,
+            "Email column available",
+            "Records whether the raw file includes an Email column. An unavailable Email column produces a Warning rather than a Failure.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.Always),
         Definition(
@@ -88,12 +90,6 @@ public static class QaChecklistCatalog
             QaChecklistSection.RawFile,
             QaCheckApplicability.Always),
         Definition(
-            QaChecklistIds.Raw.ArrivalWithinFileMonth,
-            "Arrival Dates are within the selected File Month",
-            "Confirms that Arrival Dates align with the selected File Month. A later phase may fail this check when any Arrival Date is outside that month.",
-            QaChecklistSection.RawFile,
-            QaCheckApplicability.Always),
-        Definition(
             QaChecklistIds.Raw.CurrencyConsistent,
             "Currency values are consistent",
             "Confirms that Currency values are consistent when a Currency column exists; files without a Currency column will later be marked not applicable.",
@@ -124,9 +120,21 @@ public static class QaChecklistCatalog
             QaChecklistSection.RawFile,
             QaCheckApplicability.TwoMonetaryColumns),
         Definition(
-            QaChecklistIds.Raw.SourceColumnPresent,
-            "A Source, qualifying Rate, or Market field is present",
-            "Confirms that a source-related field is present, such as Source, Booking Source, Market, Market Segment, Rate Code, Rate Plan, or Rate Plan Code. Average Rate does not satisfy this check.",
+            QaChecklistIds.Raw.StrategySourceColumnAvailable,
+            "Source column available",
+            "Records whether a Source or Booking Source strategy column is available.",
+            QaChecklistSection.RawFile,
+            QaCheckApplicability.Always),
+        Definition(
+            QaChecklistIds.Raw.StrategyRateColumnAvailable,
+            "Rate column available",
+            "Records whether a Rate Code, Rate Plan, or Rate Plan Code strategy column is available. Average Rate does not qualify.",
+            QaChecklistSection.RawFile,
+            QaCheckApplicability.Always),
+        Definition(
+            QaChecklistIds.Raw.StrategyMarketColumnAvailable,
+            "Market column available",
+            "Records whether a Market or Market Segment strategy column is available.",
             QaChecklistSection.RawFile,
             QaCheckApplicability.Always),
         Definition(

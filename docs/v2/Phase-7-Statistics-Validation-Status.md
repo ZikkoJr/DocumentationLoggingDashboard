@@ -12,6 +12,8 @@ Phase 7 remains entirely in memory. It does not parse a file, read a spreadsheet
 
 > **Deferred-text pilot correction:** Free-text statistics explanations, checklist Notes, Created By, Original File Name, and General Notes no longer run model/readiness/findings work per character. They commit on `Validated` or the form's explicit action-boundary batch. Numeric, choice, applicability, and Auto/manual controls remain immediate. The readiness fingerprint still includes every committed text value. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
 
+> **Arrival Month pilot correction:** The active Raw File checklist no longer contains `RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH`. File Month statistics remain visible and editable. Internally valid statistics create exactly one `QaFindingSource.Statistic` Failure, `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH`, only when the exact outside-count ratio is greater than 30% of Valid Arrival Date Count. Exactly 30% does not fail and no automatic Warning is created at or below the threshold. See `Pilot-Correction-Arrival-Month-Threshold.md`.
+
 ## Repository baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -179,7 +181,25 @@ File Month statistics require:
 Within Count + Outside Count = Valid Arrival Date Count
 ```
 
-Both percentages use Valid Arrival Date Count and safely become zero for a zero denominator. Valid Arrival Date Count cannot exceed the derived populated Arrival Date count. A positive Outside Count requires `RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH` to be Fail and creates no duplicate statistics Failure. If Outside Count is zero while that check is Fail, meaningful checklist notes are required to explain the legitimate month-related failure.
+All three counts must be nonnegative. Within Count and Outside Count must each be no greater than Valid Arrival Date Count, and their sum must equal Valid Arrival Date Count. Valid Arrival Date Count cannot exceed the derived nonblank Arrival Date count.
+
+Both percentages use Valid Arrival Date Count and safely become zero for a zero denominator. When Valid Arrival Date Count is zero, Within Count and Outside Count must also be zero. Invalid count relationships are readiness errors, not findings.
+
+The threshold decision uses exact counts rather than the rounded percentage display:
+
+```text
+Outside Count * 100 > Valid Arrival Date Count * 30
+```
+
+With a positive denominator and valid totals, the exact greater-than comparison creates one Active Failure:
+
+```text
+STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH
+```
+
+The finding has Statistic source, Failure severity, and no related checklist ID. Its description includes the selected File Month, valid count, inside count, outside count, and a sufficiently precise outside percentage. Exactly 30% and all lower values create no Arrival/File Month finding or Warning.
+
+While the condition remains continuously above 30%, synchronization preserves the current resolution and custom-script fields while refreshing contextual counts. When the condition falls to 30% or lower, the finding is removed and its obsolete resolution state is discarded. A later recurrence is a new Active Failure.
 
 ## Monetary statistics
 
@@ -242,11 +262,11 @@ When a managed condition ends, its finding is removed without a cache or tombsto
 - `EffectiveCreatedBy`
 - Warning, Failure, and handled finding counts
 
-It validates canonical Hotel ID/Name/PMS, File Month, QA Date, file-characteristic enum values, File Information, exact checklist-result coverage/applicability/status/source, required notes, complete statistics coverage, numeric relationships, calculated percentages, Auto formulas, Manual denominator bounds, mapped checklist consistency above 50%, File Month consistency, monetary consistency, database consistency, deterministic finding coverage, finding enums and related IDs, resolution validity, stale managed findings, duplicate IDs, and explanation requirements.
+It validates canonical Hotel ID/Name/PMS, File Month, QA Date, file-characteristic enum values, File Information, exact active-checklist-result coverage/applicability/status/source, required notes, complete statistics coverage, numeric relationships, calculated percentages, Auto formulas, Manual denominator bounds, mapped checklist consistency above 50%, File Month count integrity and threshold finding consistency, monetary consistency, database consistency, deterministic finding coverage, finding enums and related IDs, resolution validity, stale managed findings, duplicate IDs, and explanation requirements.
 
 Zero Total Data Rows is permitted only when a failed checklist result or current Failure coherently documents the empty/invalid file. With positive data rows, Blank applicable-row denominators normally must be entered and compatible with Total Data Rows. A zero Blank denominator is accepted only for a field whose matching required-field presence check is Fail, documenting that the field itself is absent. A Broken denominator may also be zero when the matching Blank row leaves a genuine zero nonblank population; a positive Broken count with that denominator remains invalid.
 
-Workflow completion problems remain structured blocking errors; they do not become `QaFinding` objects. This includes missing Hotel selection, invalid File Month, incomplete checklist items, impossible Auto or Manual denominators, count/denominator errors, unsynchronized percentages, and greater-than-50% mapped Broken/checklist contradictions. Positive Blank or Broken counts do not block merely because they are positive; ready Warning and ready Failure reports are both supported.
+Workflow completion problems remain structured blocking errors; they do not become `QaFinding` objects. This includes missing Hotel selection, invalid File Month, incomplete active checklist items, impossible Auto or Manual denominators, File Month count inconsistencies, count/denominator errors, unsynchronized percentages, and greater-than-50% mapped Broken/checklist contradictions. Positive Blank, Broken, or outside-File-Month counts do not block merely because they are positive; ready Warning and ready Failure reports are both supported.
 
 ## Created By workflow
 

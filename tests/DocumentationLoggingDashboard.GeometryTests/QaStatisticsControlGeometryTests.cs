@@ -1268,6 +1268,7 @@ internal static class QaStatisticsControlGeometryTests
         QaReport report = new()
         {
             ReportId = "synthetic-geometry-no-save",
+            FileId = "001234",
             CreatedBy = "Geometry Harness",
             OriginalFileName = "synthetic-layout-only.csv",
             Statistics = new QaStatistics

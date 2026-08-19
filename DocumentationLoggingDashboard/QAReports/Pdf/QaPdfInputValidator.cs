@@ -37,6 +37,18 @@ internal static class QaPdfInputValidator
                 "The effective Created By value is unavailable.");
         }
 
+        if (report.SchemaVersion != QaReport.CurrentSchemaVersion)
+        {
+            throw new QaPdfGenerationException(
+                "The QA report schema version is not current.");
+        }
+
+        if (string.IsNullOrWhiteSpace(report.FileId))
+        {
+            throw new QaPdfGenerationException(
+                "A File ID is required for PDF generation.");
+        }
+
         if (string.IsNullOrWhiteSpace(
                 validationResult.ValidatedReportFingerprint))
         {

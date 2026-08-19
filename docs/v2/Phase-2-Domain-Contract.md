@@ -10,6 +10,8 @@ This phase does not add a working QA workflow. It does not add UI, dynamic appli
 
 > **Deferred-text boundary:** The final V2 correction changes when QA report free text is committed, not the domain values or readiness fields themselves. Draft text is committed at validation or an explicit workflow/action boundary, then the existing domain synchronization runs once. Final verification is recorded in `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
 
+> **Post-pilot checklist correction:** `RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH`, `RAW.REQUIRED.EMAIL_PRESENT`, and `RAW.SOURCE.COLUMN_PRESENT` are retained only as retired stable identifiers and are no longer active definitions. After adding the replacement Email and three Strategy availability checks, the active catalog contains 22 Raw File definitions and 7 Database definitions, 29 total. File Month statistics remain part of the domain contract. More than 30% outside the selected File Month creates one statistics-sourced Failure using Valid Arrival Date Count; exactly 30% or less creates no Arrival/File Month finding. See `Pilot-Correction-Arrival-Month-Threshold.md` and `../updates/Detailed-QA-Check-Changes.md`.
+
 ## Architectural Principle
 
 The manual UI, future PDF renderer, and future automated diagnostic system must all use the same QA domain models and stable checklist identifiers. Those layers should not create separate representations of QA reports, checklist results, findings, or checklist IDs.
@@ -213,7 +215,7 @@ It does not contain status, user notes, evaluated timestamp, finding resolution,
 
 `QaChecklistIds` contains deterministic string constants. IDs are not generated at runtime.
 
-`QaChecklistCatalog.Definitions` exposes one deterministic read-only catalog. It contains exactly 21 Raw File definitions, 7 Database definitions, and 28 total definitions. Raw File definitions appear first in the approved order; Database definitions appear after them in the approved order.
+`QaChecklistCatalog.Definitions` exposes one deterministic read-only active catalog. It contains exactly 22 Raw File definitions, 7 Database definitions, and 29 total definitions. Raw File definitions appear first in the approved order; Database definitions appear after them in the approved order. The three retired IDs remain available for source and historical-artifact compatibility, but no active definition uses them and new reports contain no result for them.
 
 Every Phase 2 definition has:
 
@@ -237,7 +239,7 @@ Phase 2 stores applicability metadata but does not evaluate it. Conditional defi
 
 ## Warning Versus Failure
 
-A failure means a checklist requirement was not satisfied or a corrected statistics threshold is above 50%. Examples include a required field being absent, a populated-value validity condition with Broken Data above 50%, Arrival Date outside File Month, a DB value differing from the processed raw value, a required DB value being missing, or the Source/qualifying Rate/Market field being absent.
+A failure means a checklist requirement was not satisfied or a corrected statistics threshold was exceeded. Examples include a required field being absent, a populated-value validity condition with Broken Data above 50%, more than 30% of valid nonblank Arrival Dates being outside the selected File Month, a DB value differing from the processed raw value, a required DB value being missing, or all three Source/qualifying Rate/Market strategy columns being absent. The Arrival Month condition is represented only by the statistics finding `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH`; it is not a checklist result or checklist-sourced Failure.
 
 A warning means the check may pass, but a suspicious or noteworthy condition is reported separately as a finding. Corrected Blank and Broken percentages greater than 0% through 50%, inclusive, are Warnings. Other examples include Full Name used instead of separate name columns, more than two monetary columns, multiple Confirmation Number candidate columns, mixed Currency values when a Currency field exists, Stay Value above 10,000 when high values are not expected, unusual Average Rate or Stay Value, raw/DB row-count difference of 10 or more, and an explained rejected database record.
 

@@ -518,7 +518,7 @@ internal static class QaBlankBrokenStatisticsRegressionTests
         documentedMissingBroken.TotalApplicableNonblankValues = 0;
         QaCheckResult emailPresence = CheckResult(
             documentedMissingField,
-            QaChecklistIds.Raw.RequiredEmailPresent);
+            QaChecklistIds.Raw.EmailColumnAvailable);
         emailPresence.Status = QaCheckStatus.Fail;
         emailPresence.Notes = "The synthetic source intentionally omits the Email field.";
         Synchronize(documentedMissingField);
@@ -673,6 +673,7 @@ internal static class QaBlankBrokenStatisticsRegressionTests
         QaReport report = new()
         {
             ReportId = $"synthetic-{Guid.NewGuid():N}",
+            FileId = "001234",
             HotelInformation = new QaHotelInformation
             {
                 HotelId = "SYN-001",

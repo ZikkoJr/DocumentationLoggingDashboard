@@ -2,6 +2,8 @@
 
 > **Production-candidate cleanup update (2026-07-20):** Final synthetic semantic, deferred-text, geometry, blocked-save, overwrite, paired PDF/index, and V1 regressions pass; the permanent harness is in the solution; production diagnostic counters are removed; and an external candidate is being prepared for independent review. The candidate is still not merged, tagged, or released. Real 100% and 150% DPI remain untested and cannot be checked here.
 
+> **Arrival Month correction hold (2026-07-23):** Source work begins at `38422987180e124f22c8a836cc59fa858243251b`; the previously approved frozen-pilot baseline remains `d8f2eeeab6d7dea83c9c2924ccb2987645fc69cc`. Baseline/final solution builds, publish, an initial focused 4/4 Debug suite, representative PDFs, and paired-save/index evidence passed. Reviewer-expanded Debug/Release and V1 executable reruns are blocked by Windows Smart App Control policy `{0283ac0f-fff1-49ae-ada1-8a933130cad6}` and are not claimed as passed. Keep pilot execution, package replacement, merge, tag, and release on hold. No correction commit or push exists.
+
 ## Purpose and decision boundary
 
 Use this checklist to move Version 2 from Phase 10 verification through a controlled pilot and, only after separate approval, toward merge and broad release. It is an operator checklist, not evidence that Version 2 has been released.
@@ -17,7 +19,18 @@ Checkbox convention:
 
 No historical Phase 10 result in this checklist is classified as `Direct GUI test`. Offscreen WinForms control tests are `Service or harness test`; they do not replace visible desktop testing.
 
-> **Current decision:** **Production candidate may proceed to independent review only.** This is not authorization to resume the frozen pilot, merge `main`, create `v2.0.0`, or create a GitHub release.
+> **Current decision:** **The Arrival Month correction must complete its focused gate before a corrected candidate may proceed to independent review.** The prior `3842298` package is not corrected evidence. Nothing here authorizes a commit, push, package replacement, pilot resumption, merge of `main`, `v2.0.0`, or a GitHub release.
+
+## Arrival Month correction gate
+
+- [x] **Active catalog/result/UI retirement verified** - Execution Type: `Service or harness test`; Status: `Pass`. The focused combined-update suite confirmed 29 active definitions, 22 Raw and 7 DB, one result/control per active definition, no retired result/row/gap, and unchanged monetary spot-check applicability.
+- [x] **Exact threshold and denominator suite passes** - Execution Type: `Service or harness test`; Status: `Pass`. The initial focused suite passed 0%, 20%, exactly 30%, 31%, `3/10`, and `4/13` using Valid Arrival Date Count; the fractional description retained sufficient precision.
+- [x] **Invalid File Month totals block readiness** - Execution Type: `Service or harness test`; Status: `Pass`. The initial suite blocked all-zero-denominator-positive, category-above-valid, category-sum-mismatch, and negative cases without an artificial finding or crash.
+- [x] **Core finding lifecycle passes** - Execution Type: `Service or harness test`; Status: `Pass`. The initial suite preserved handled state/identity through continuous above-threshold count changes, refreshed description, removed the finding at 30%, and recreated it Active without stale script state.
+- [ ] **Reviewer-expanded assertions rerun passes** - Execution Type: `Service or harness test`; Status: `Blocked`. Literal-zero, explicit unrelated-edit, and external evidence-path-guard assertions build, but Smart App Control blocks the newly unsigned test DLL from loading; Code Integrity events are 3033/3077.
+- [x] **PDF and paired-save/index matrix passes** - Execution Type: `Service or harness test`; Status: `Pass`. Four reports produced byte-identical pairs, 2/2/3/3 pages, four correct index statuses, and zero transaction artifacts; all 10 rendered pages passed visual inspection. Fresh logical keys were used, so overwrite prompts were not rerun.
+- [ ] **Final Debug/Release/build/package/V1 gates pass** - Execution Type: `Service or harness test`; Status: `Blocked`. Baseline/final solution builds and publish passed; package diff is empty and V1 production source is unchanged. The fresh executable V1 regression rerun was blocked by the same Smart App Control policy, so the combined gate is not Pass.
+- [ ] **Arrival Month correction independently reviewed and committed only with authorization** - Execution Type: `Manual test pending`; Status: `Not Run`. Record the exact reviewed commit only after explicit authorization; a passing local diff does not authorize a push, package replacement, or pilot resumption.
 
 ## Deferred-text correction gate - local evidence complete, review pending
 
@@ -166,7 +179,7 @@ Controlled internal pilot activity exposed the P1 defect. Further affected execu
 - [ ] **Pilot environment and backup verified** — Execution Type: `Manual test pending`; Status: `Not Run`. Confirm the configured root, backup, write access, available disk space, and V1 log access before the first QA report.
 - [ ] **Multiple Hotels and PMS systems** — Execution Type: `Manual test pending`; Status: `Not Run`. Use multiple approved Hotels and multiple PMS systems and confirm canonical Hotel/PMS selection.
 - [ ] **Monetary scenarios** — Execution Type: `Manual test pending`; Status: `Not Run`. Include one, two, and more-than-two monetary-column cases and verify checklist/statistics applicability.
-- [ ] **Status scenarios** — Execution Type: `Manual test pending`; Status: `Not Run`. After authorization, save corrected zero, Blank Warning, Broken Warning, combined Warnings, Blank Failure, Broken Failure, and handled Broken Failure reports and verify `Pass`, `Pass with Warnings`, and `Fail` outcomes.
+- [ ] **Status scenarios** — Execution Type: `Manual test pending`; Status: `Not Run`. After authorization, save corrected zero, Blank Warning, Broken Warning, combined Warnings, Blank Failure, Broken Failure, handled Broken Failure, Arrival outside at 20%, exactly 30%, active 31%, and handled-above-threshold reports; verify `Pass`, `Pass with Warnings`, and `Fail` outcomes.
 - [ ] **Custom-script scenario** — Execution Type: `Manual test pending`; Status: `Not Run`. Handle one statistics Failure independently; confirm Failure severity and Failed Checks placement remain while the overall status becomes Pass with Warnings when no Active Failure remains.
 - [ ] **Overwrite cancellation** — Execution Type: `Manual test pending`; Status: `Not Run`. Decline the default-No overwrite prompt and confirm both PDFs and the QA index are byte-for-byte unchanged.
 - [ ] **Overwrite confirmation** — Execution Type: `Manual test pending`; Status: `Not Run`. Confirm replacement and verify one current Hotel copy, one current PMS copy, and one current index entry for the Hotel ID/File Month key.

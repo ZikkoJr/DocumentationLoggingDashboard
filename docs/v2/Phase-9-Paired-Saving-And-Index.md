@@ -12,6 +12,8 @@ This document records the Phase 9 implementation and its focused existing-report
 
 > **Deferred-text controlled-pilot boundary:** The final P2 correction commits pending text before the readiness/save transaction begins. Five additional synthetic scenarios passed with final text in PDFs, byte-identical Hotel/PMS pairs, correct index statuses, and no transaction artifacts. The final matrix also passed blocked-output guards and logical-report overwrite replacement. The transaction and index formats are unchanged. See `Pilot-Correction-Deferred-Text-Commit.md` and `V2-Production-Readiness.md`.
 
+> **Arrival Month controlled-pilot boundary:** The focused correction does not change the paired-save transaction, logical key, filename, overwrite, or QA index format. It changes the status and PDF content consumed by Phase 9: 30% or less outside creates no Arrival/File Month finding, above 30% with an Active statistics Failure is Fail, and a handled Failure follows the existing Pass with Warnings rule when no other Active Failure remains. Corrected paired-byte and index evidence is pending in `Pilot-Correction-Arrival-Month-Threshold.md`.
+
 ## Approved baseline
 
 - Required and active branch: `v2-qa-reports`.
@@ -273,7 +275,7 @@ Every save attempt executes the existing synchronization sequence before renderi
 6. assign `CurrentReport.ReportStatus` only when ready;
 7. store and display the result and select the Statistics/Readiness tab.
 
-The gate requires `IsReady`, zero blocking errors, a calculated status, exact agreement with `CurrentReport.ReportStatus`, and a nonblank readiness fingerprint. A calculated Fail status is still a ready, valid final status and can be saved. Under the corrected Blank/Broken rules, a positive percentage through and including 50% produces a Warning, while a percentage above 50% produces a Failure. A handled Failure retains its finding severity and remains visible under Failed Checks; if no active Failure remains, the overall calculated status is Pass with Warnings. The Phase 8 renderer and Phase 9 save service independently recheck readiness/fingerprint invariants, including denominator mode and values; neither trusts an old `LastReadinessResult` by itself.
+The gate requires `IsReady`, zero blocking errors, a calculated status, exact agreement with `CurrentReport.ReportStatus`, and a nonblank readiness fingerprint. A calculated Fail status is still a ready, valid final status and can be saved. Under the corrected Blank/Broken rules, a positive percentage through and including 50% produces a Warning, while a percentage above 50% produces a Failure. Under the Arrival Month rule, exactly 30% or less outside produces no Arrival/File Month finding, while more than 30% produces one statistics Failure. A handled Failure retains its finding severity and remains visible under Failed Checks; if no active Failure remains, the overall calculated status is Pass with Warnings. The Phase 8 renderer and Phase 9 save service independently recheck readiness/fingerprint invariants, including denominator mode and values; neither trusts an old `LastReadinessResult` by itself.
 
 When `CurrentReport.CreatedBy` is blank, the form shows one default-No confirmation before taking the timestamp or rendering. It identifies `QaReportValidationResult.EffectiveCreatedBy`, which is the approved non-mutating fallback. Choosing No performs no render and no write. Choosing Yes does not mutate `CurrentReport.CreatedBy`; the exact effective value is used by the Phase 8 PDF and the index.
 

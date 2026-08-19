@@ -285,7 +285,7 @@ internal static class QaDeferredTextCommitRegressionTests
 
     private static void TestStatisticsExplanation(TextWriter output)
     {
-        QaReport report = new();
+        QaReport report = new() { FileId = "001234" };
         report.FileCharacteristics.MonetaryColumnScenario =
             QaMonetaryColumnScenario.TwoMonetaryColumns;
         report.Statistics.UnusualAverageRateValues.HasUnusualValues = true;

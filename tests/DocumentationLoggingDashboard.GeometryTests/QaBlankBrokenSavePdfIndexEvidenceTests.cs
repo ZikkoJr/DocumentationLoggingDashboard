@@ -322,6 +322,9 @@ internal static class QaBlankBrokenSavePdfIndexEvidenceTests
             Check(
                 preparation.FinalStatus == scenario.ExpectedStatus,
                 $"{scenario.Name}: prepared status was {preparation.FinalStatus}, expected {scenario.ExpectedStatus}.");
+            Check(
+                preparation.FileId == report.FileId,
+                $"{scenario.Name}: prepared File ID did not preserve the report identifier.");
 
             QaReportSaveResult saveResult = saveService.Save(
                 preparation,
@@ -360,6 +363,9 @@ internal static class QaBlankBrokenSavePdfIndexEvidenceTests
                 saveResult,
                 generatedAt,
                 scenario);
+            Check(
+                indexEntry.FileId == report.FileId,
+                $"{scenario.Name}: index File ID did not preserve the report identifier.");
             expectedEntries.Add(new ExpectedIndexEntry(
                 saveResult.ReportKey,
                 scenario.ExpectedStatus));
@@ -962,6 +968,7 @@ internal static class QaBlankBrokenSavePdfIndexEvidenceTests
         QaReport report = new()
         {
             ReportId = $"synthetic-save-evidence-{caseNumber:D2}-{Guid.NewGuid():N}",
+            FileId = $"00{caseNumber:D4}",
             HotelInformation = new QaHotelInformation
             {
                 HotelId = canonicalHotel.HotelId,

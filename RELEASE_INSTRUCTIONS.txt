@@ -4,6 +4,22 @@ Documentation Logging Dashboard Release Instructions
 This file distinguishes a development publish from the reviewed V2 production
 candidate. V2 does not add an installer, database, login system, or cloud sync.
 
+ARRIVAL MONTH CORRECTION HOLD (2026-07-23): The existing 3842298 candidate
+predates retirement of the active Arrival Month checklist row and the exact
+greater-than-30-percent statistics Failure rule. Do not use it as corrected
+evidence or resume the pilot. A replacement candidate requires completed
+verification, an authorized commit, independent review, and separate package
+and pilot authorization. Initial focused evidence passed, but reviewer-expanded
+and V1 executable reruns remain blocked by Windows Smart App Control.
+
+POST-PILOT UPDATE HOLD (2026-08-18): The Detailed QA / Quick QA Surface update
+supersedes the prior candidate's product behavior. No prior V2 package contains
+Quick QA, mandatory Detailed File ID, the new Email/strategy semantics, or the
+required spreadsheet license notices. Do not treat a prior package as current
+update evidence. A new candidate requires the complete matrix in
+docs/updates/Quick-QA-Test-Matrix.md, independent review, and separate package
+and pilot authorization. This notice does not erase the Arrival Month hold.
+
 Production candidate
 --------------------
 
@@ -16,6 +32,12 @@ DocumentationLoggingDashboard.pdb, appsettings.json, production-manifest.txt,
 and START-HERE.txt. Read START-HERE.txt before first launch. Do not launch the
 production candidate from the Git repository, bin\Debug, bin\Release, the old
 V1 PublishedApp folder, the frozen pilot package, or a temporary publish folder.
+
+That inventory describes the historical V2 candidate. A new post-pilot
+candidate must additionally contain THIRD-PARTY-NOTICES.txt and its manifest
+must record the final resolved ClosedXML/transitive graph plus the notice file's
+size and hash. Update START-HERE.txt for the two QA actions and Quick workbook
+storage before approving a new package.
 
 Keep the operational documentation root separate from the application folder
 and back it up before first production use. The Debugging Log Hotel/PMS routing
@@ -32,6 +54,10 @@ The script publishes the app for Windows x64 using Release configuration,
 self-contained output, and single-file publishing. Its PublishedApp output is a
 development location and is not the immutable V2 production candidate.
 
+The fixed development output directory is not automatically a clean-room
+inventory. For release evidence, also publish to a new empty temporary folder
+with the equivalent dotnet publish command and inspect only that fresh output.
+
 Development publish location
 ----------------------------
 
@@ -42,6 +68,10 @@ PublishedApp\win-x64
 The expected executable is:
 
 PublishedApp\win-x64\DocumentationLoggingDashboard.exe
+
+The post-pilot publish must also include:
+
+PublishedApp\win-x64\THIRD-PARTY-NOTICES.txt
 
 Launch the development publish
 ------------------------------
@@ -79,6 +109,30 @@ LogIndex.txt is saved in:
 
 DocumentationLogs\Index\LogIndex.txt
 
+QA storage
+----------
+
+Detailed QA Report continues to create paired Hotel/PMS PDFs and
+QAReports\Index\QAReportIndex.txt. New Detailed reports require text File ID,
+but File ID does not change the PDF filename or Hotel ID + File Month overwrite
+identity.
+
+Quick QA writes one logical event to both a selected client workbook and Hotel
+history:
+
+DocumentationLogs\QAReports\SurfaceQA\<selected workbook>.xlsx
+DocumentationLogs\QAReports\ByHotel\<canonical hotel>\QuickQAHistory.xlsx
+
+The selected documentation root replaces DocumentationLogs when configured.
+Quick QA does not create a PDF, PMS history, or Detailed index entry. Surface
+workbooks are append-only through the app, and the saved last-used preference
+contains only a direct-child filename under QAReports\SurfaceQA.
+
+If a Surface or Hotel history workbook is open in Excel or otherwise
+unavailable, close it and retry. A failure must not report success or leave an
+ordinary one-sided Quick event. Back up the operational documentation root
+before first post-pilot use.
+
 Changing the logs folder
 ------------------------
 
@@ -111,5 +165,47 @@ Privacy reminder
 ----------------
 
 Avoid entering guest names, emails, payment data, credentials, or full hotel
-files into logs. Use ticket IDs, hotel IDs, script names, and summarized issues
-instead.
+files into logs, findings, or Summary. Do not copy reservation-level PII or raw
+rows. Use ticket IDs, hotel IDs, script names, and field/check-level summaries.
+
+Post-pilot build and verification
+---------------------------------
+
+From the repository root, use the console harness rather than relying on
+dotnet test:
+
+dotnet build DocumentationLoggingDashboard.sln -c Debug
+dotnet run --project tests\DocumentationLoggingDashboard.GeometryTests\DocumentationLoggingDashboard.GeometryTests.csproj -c Debug --no-build --
+dotnet build DocumentationLoggingDashboard.sln -c Release
+dotnet run --project tests\DocumentationLoggingDashboard.GeometryTests\DocumentationLoggingDashboard.GeometryTests.csproj -c Release --no-build --
+powershell -ExecutionPolicy Bypass -File .\publish-windows.ps1
+
+Record exact exits, warning/error and assertion counts, the final package graph,
+and git status. Verify from the published executable: new Surface creation,
+canonical and approved-legacy append, Hotel history, rollback/lock behavior,
+Detailed PDF generation, and operation without Excel automation or installation.
+List every GUI scenario that could not be exercised instead of marking it Pass.
+
+Dependency and notice requirements
+----------------------------------
+
+ClosedXML must be exactly 0.105.1 and must be the only added Excel library.
+Before packaging, reconcile project.assets.json with:
+
+dotnet list DocumentationLoggingDashboard\DocumentationLoggingDashboard.csproj package --include-transitive
+dotnet list DocumentationLoggingDashboard\DocumentationLoggingDashboard.csproj package --include-transitive --vulnerable
+
+Confirm the resolved graph still matches the exact 2026-08-18 inventory in
+THIRD-PARTY-NOTICES.txt, confirm every selected dependency's license/notice,
+and verify that the notice file is copied beside the executable. ClosedXML is
+managed and must not add an Excel/Interop, LibreOffice, browser, cloud API,
+external executable, or runtime installation requirement.
+
+Current update documents
+------------------------
+
+Use these current documents without rewriting historical phase/pilot evidence:
+
+docs\updates\Quick-QA-Surface-QA-Design.md
+docs\updates\Detailed-QA-Check-Changes.md
+docs\updates\Quick-QA-Test-Matrix.md

@@ -2,6 +2,8 @@
 
 > **Final V2 production-candidate cleanup (2026-07-20):** The approved Phase 1-10 baseline plus the Blank/Broken, layout, and deferred-text pilot corrections completed final source inspection, synthetic regression, V1 isolation, overwrite, paired PDF/index, and actual-125% visible layout verification. The permanent regression project is now in the solution, and test-only diagnostic counters were removed from the production form. Real 100% and 150% DPI remain untested and are not claimed. The authoritative current record is `V2-Production-Readiness.md`. `main` remains unmerged, no `v2.0.0` tag or release exists, and Debugging Log Hotel/PMS routing remains deferred to V2.1.
 
+> **Post-pilot correction evidence:** The historical 28-definition evidence below predates the approved retirements and replacements. The current active catalog has 29 definitions: 22 Raw File and 7 Database. File Month statistics remain, and only an exact outside ratio greater than 30% creates the statistics Failure `STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH`. The historical Arrival-only evidence below remains scoped to that correction; current combined-update evidence is recorded under `docs/updates`. Starting source commit is `38422987180e124f22c8a836cc59fa858243251b`; no commit, pilot resumption, merge, tag, or release is claimed.
+
 ## Purpose and decision boundary
 
 Phase 10 performed final regression, hardening, pilot-readiness, and release-preparation work for the Version 2 QA Report workflow while preserving Version 1. Work stayed on `v2-qa-reports` and started from the approved Phase 9 baseline `5ff47c4ddfd54cf38cb70fd9e4cca65a2fd793b1`.
@@ -114,7 +116,7 @@ Corrupt, empty, unsupported-schema, relationship-invalid, missing, and inaccessi
 
 ### QA Report form, catalog, and applicability
 
-**Execution Type: Service or harness test; Status: Pass.** The catalog contained the approved 28 definitions: 21 Raw File QA and 7 DB QA. Default applicability yielded 22 applicable and 6 Not Applicable checks. Separate-name/full-name, currency, one/two/more-than-two monetary-column, confirmation-candidate, and rejected-record branches were exercised. Report defaults, canonical selected Hotel/PMS values, closing without output, and offscreen construction of all production forms/controls passed.
+**Execution Type: Service or harness test; Historical Status: Pass.** At the Phase 10 checkpoint, the catalog contained the then-approved 28 definitions: 21 Raw File QA and 7 DB QA. Default applicability yielded 22 applicable and 6 Not Applicable checks. Separate-name/full-name, currency, one/two/more-than-two monetary-column, confirmation-candidate, and rejected-record branches were exercised. Report defaults, canonical selected Hotel/PMS values, closing without output, and offscreen construction of all production forms/controls passed. Those numeric catalog/control expectations are superseded by the post-pilot update; current expected values are 29 total, 22 Raw, 7 DB, 23 applicable, and 6 Not Applicable.
 
 **Execution Type: Manual test pending; Status: Not Run.** Visible selector behavior, unmatched free text, message boxes, tab interactions, and actual Escape/Close behavior remain pending.
 

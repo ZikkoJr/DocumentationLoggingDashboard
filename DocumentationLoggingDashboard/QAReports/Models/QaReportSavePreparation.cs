@@ -85,6 +85,10 @@ public sealed class QaReportSavePreparation
 
     public QaFileMonth FileMonth => IndexEntry.FileMonth;
 
+    public string FileId => IndexEntry.FileId
+        ?? throw new InvalidOperationException(
+            "A newly prepared Detailed QA index entry requires a File ID.");
+
     public string HotelCopyPath => HotelFinalPath;
 
     public string PmsCopyPath => PmsFinalPath;

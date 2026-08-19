@@ -2,16 +2,41 @@ Documentation Logging Dashboard
 ===============================
 
 Documentation Logging Dashboard is a C# WinForms desktop application for the
-three established V1 plain-text documentation logs and the V2 QA Report
-workflow. V1 entries retain their daily .txt files and LogIndex.txt. V2 creates
-paired Hotel/PMS PDF reports and a separate QA Report index.
+three established V1 plain-text documentation logs and two explicit QA
+workflows. V1 entries retain their daily .txt files and LogIndex.txt. Detailed
+QA creates paired Hotel/PMS PDF reports and a separate QA Report index. Quick QA
+appends a client-facing Surface workbook and the selected Hotel's private Quick
+QA history as one logical save.
 
-V2 QA Reports
--------------
+QA actions
+----------
 
-Create QA Report supports Hotel/PMS metadata, a 28-item checklist, separate
-Blank and Broken statistics, findings, readiness validation, paired PDF saving,
-logical-report overwrite handling, and a dedicated QAReportIndex.txt.
+The dashboard exposes two direct actions. Detailed QA Report opens the existing
+full report workflow. Quick QA opens a dedicated one-page Surface QA workflow.
+There is no report-type wizard, and the three V1 logging actions are unchanged.
+
+Detailed QA Report
+------------------
+
+Detailed QA Report supports Hotel/PMS metadata, mandatory text File ID, a
+29-item checklist, separate Blank and Broken statistics, findings, readiness
+validation, paired PDF saving, logical-report overwrite handling, and a
+dedicated QAReportIndex.txt. File ID preserves leading zeroes and appears in new
+schema-2 PDFs/index entries, but it does not change the PDF filename or existing
+Hotel ID + File Month overwrite identity. Historical schema-1 PDFs and 13-line
+index entries are not migrated and remain readable.
+
+The active checklist contains 22 Raw File items and 7 Database items.
+RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH is retired from that catalog. File Month
+statistics remain visible; more than 30% of valid nonblank Arrival Dates outside
+the selected File Month creates one statistics-sourced Failure, while exactly
+30% or less creates no Arrival/File Month finding.
+
+RAW.REQUIRED.EMAIL_PRESENT is retired. The new Email column available row
+produces one Warning, never a Failure, when unavailable. The old combined Source
+row is replaced by separate Source, Rate, and Market availability rows. One or
+two unavailable strategy categories produce exactly one Strategy Warning; all
+three produce exactly one aggregate Failure.
 
 Blank and Broken thresholds are independent:
 
@@ -33,6 +58,49 @@ written from the same PDF bytes, and the QA index records the final status.
 
 The planned V2.1 enhancement "Route Debugging Logs into the applicable Hotel
 and PMS folders" is deferred. V2 does not change V1 Debugging Log routing.
+
+Quick QA / Surface QA
+---------------------
+
+Quick QA is a fixed manual checklist with 14 Raw File and 7 Database checks. It
+has no Statistics, File Characteristics, Arrival/File Month analysis, PDF,
+Detailed index update, or PMS history. It uses canonical Hotel/PMS metadata,
+File Month, mandatory text File ID, direct Warning/N/A choices where approved,
+per-finding custom-script handling, a live Result, and a generated but editable
+Summary that cannot be saved after it becomes stale.
+
+A successful Quick QA appends exactly one row to each of:
+
+DocumentationLogs/QAReports/SurfaceQA/<selected workbook>.xlsx
+DocumentationLogs/QAReports/ByHotel/<canonical hotel>/QuickQAHistory.xlsx
+
+The selected documentation root replaces DocumentationLogs when a custom root
+is configured. Client workbooks use exact columns File Month, Hotel Name, Hotel
+ID, PMS, File ID, Result, and Summary. Hotel history adds a round-trip
+DateTimeOffset-style QA Timestamp. File Month is yyyy-MM, and both IDs are text.
+
+New Surface workbooks contain worksheet Surface QA and table SurfaceQaTable.
+The app also accepts only the documented seven legacy header aliases, including
+Month 2026 and Pass/Fail/Warning, then canonicalizes those headers during a
+successful staged append while preserving historical rows. The selected
+workbook must be a direct child of QAReports/SurfaceQA. Existing files are never
+silently overwritten.
+
+Both workbook updates are staged, verified, concurrency-checked, committed, and
+rolled back as one logical transaction. If Excel has either workbook open or a
+destination is otherwise unavailable, the app reports a friendly failure and
+does not leave an ordinary one-sided Quick QA event.
+
+ClosedXML 0.105.1 supplies managed .xlsx support. Excel, Office Interop,
+LibreOffice, browser automation, cloud APIs, external spreadsheet executables,
+and runtime package installation are not required or used. Package licenses and
+notices are recorded in THIRD-PARTY-NOTICES.txt.
+
+Current design and verification contracts are in:
+
+- docs/updates/Quick-QA-Surface-QA-Design.md
+- docs/updates/Detailed-QA-Check-Changes.md
+- docs/updates/Quick-QA-Test-Matrix.md
 
 Supported log types
 -------------------
@@ -183,8 +251,9 @@ Privacy reminder
 ----------------
 
 Do not enter guest names, emails, payment data, credentials, or full hotel files
-into logs. Use ticket IDs, hotel IDs, script names, and summarized issues
-instead.
+into logs, findings, or QA Summary. Do not copy reservation-level PII or full
+source rows. Use ticket IDs, hotel IDs, script names, and field/check-level
+summaries instead.
 
 How to build and run for development
 ------------------------------------
@@ -192,6 +261,10 @@ How to build and run for development
 From the repository root, build the solution:
 
 dotnet build DocumentationLoggingDashboard.sln
+
+Run the complete custom regression harness after the Debug build:
+
+dotnet run --project tests\DocumentationLoggingDashboard.GeometryTests\DocumentationLoggingDashboard.GeometryTests.csproj -c Debug --no-build --
 
 Run the app from Visual Studio, or run the built executable for development
 only from:
@@ -212,6 +285,9 @@ The published app is created under:
 
 PublishedApp\win-x64
 
+The publish must also contain THIRD-PARTY-NOTICES.txt. Published Quick QA must
+be verified without relying on Excel or another external spreadsheet runtime.
+
 The development executable can be launched from:
 
 PublishedApp\win-x64\DocumentationLoggingDashboard.exe
@@ -222,3 +298,10 @@ DocumentationLoggingDashboard-V2-Production-<SHORTSHA>. Do not use the
 repository, bin output, old V1 PublishedApp folder, or frozen pilot package as
 the production working application folder. Release details are in
 RELEASE_INSTRUCTIONS.txt.
+
+The existing 3842298 external candidate predates the focused Arrival Month
+correction described above. It is not corrected pilot evidence and must not be
+used to resume the pilot. A replacement package requires completed verification,
+independent review, and separate authorization. The initial focused suite and
+representative PDF/save/index evidence passed, but reviewer-expanded and V1
+executable reruns are currently blocked by Windows Smart App Control.

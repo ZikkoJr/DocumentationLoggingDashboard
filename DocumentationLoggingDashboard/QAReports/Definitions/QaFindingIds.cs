@@ -29,6 +29,15 @@ public static class QaFindingIds
     public const string RejectedRecordsStatisticWarning =
         "WARN:STAT:REJECTED_RECORDS";
 
+    public const string ArrivalOutsideFileMonthStatisticFailure =
+        "STAT:FAIL:ARRIVAL_OUTSIDE_FILE_MONTH";
+
+    public const string StrategySourceRateMarketWarning =
+        "WARN:STRATEGY:SOURCE_RATE_MARKET";
+
+    public const string StrategySourceRateMarketFailure =
+        "FAIL:STRATEGY:SOURCE_RATE_MARKET";
+
     public static string FailureForCheck(string checkId)
     {
         return CreateForCheck("FAIL:", checkId);

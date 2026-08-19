@@ -165,6 +165,7 @@ public sealed class QaReportSaveService
         ValidateFreshReadiness(request);
 
         QaReport report = request.Report;
+        string fileId = RequireTrimmedFileId(report.FileId);
         QaHotelInformation hotelInformation = report.HotelInformation
             ?? throw MetadataMismatch(
                 "The report no longer contains Hotel information.");
@@ -336,6 +337,7 @@ public sealed class QaReportSaveService
             canonicalHotelId,
             RequireTrimmedMetadataValue(canonicalPms.PmsName, "canonical PMS Name"),
             fileMonth,
+            fileId,
             finalStatus,
             request.ValidationResult.EffectiveCreatedBy,
             filename,
@@ -1165,6 +1167,19 @@ public sealed class QaReportSaveService
         {
             throw MetadataMismatch(
                 $"Current {fieldName} metadata is unavailable.");
+        }
+
+        return value.Trim();
+    }
+
+    private static string RequireTrimmedFileId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new QaReportSaveException(
+                QaReportSaveErrorCategory.ReportNotReady,
+                QaReportSaveStage.Preparation,
+                "A File ID is required for saving the QA report.");
         }
 
         return value.Trim();

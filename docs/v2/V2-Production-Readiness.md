@@ -1,5 +1,7 @@
 # V2 Production Readiness
 
+> **Arrival Month correction hold (2026-07-23):** This document records the prior production candidate at source commit `38422987180e124f22c8a836cc59fa858243251b`, which is also the starting source commit for the new focused correction. That candidate still contains the now-retired active Arrival Month checklist rule. The correction's baseline/final solution builds, publish, initial 4/4 Debug suite, representative PDF rendering, and paired-save/index evidence passed; reviewer-expanded Debug/Release and V1 executable reruns are blocked by Windows Smart App Control and are not claimed as passed. Exact evidence is in `Pilot-Correction-Arrival-Month-Threshold.md`. No new commit, independent approval, corrected pilot package, or pilot-resumption authorization exists.
+
 ## Release identity
 
 - Repository: `ZikkoJr/DocumentationLoggingDashboard`

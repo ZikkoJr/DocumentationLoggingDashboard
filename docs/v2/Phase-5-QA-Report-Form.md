@@ -1,5 +1,7 @@
 # Phase 5 QA Report Form and Dynamic Checklist Workflow
 
+> **Post-pilot checklist correction:** The Phase 5 implementation originally constructed 28 controls from the then-current catalog. The active catalog now contains 29 definitions: 22 Raw File and 7 Database. `RAW.DATES.ARRIVAL_WITHIN_FILE_MONTH`, `RAW.REQUIRED.EMAIL_PRESENT`, and `RAW.SOURCE.COLUMN_PRESENT` are retired; the replacement Email and three Strategy availability rows are catalog driven. A new form creates no result, control, hidden row, or empty space for a retired ID. See `Pilot-Correction-Arrival-Month-Threshold.md` and `../updates/Detailed-QA-Check-Changes.md`.
+
 ## Purpose and boundaries
 
 Phase 5 adds an owner-centered QA Report form to the existing WinForms dashboard. The form owns one real, in-memory `QaReport`, synchronizes report details and file characteristics into that object, and builds a manual Raw File/Database checklist from the approved Phase 2 catalog. It also adds a reusable hotel selector that searches and selects the real Phase 3 metadata objects through the Phase 4 search helper.
@@ -208,7 +210,7 @@ Selecting More Than Two shows an informational note that a later phase will reco
 
 All checklist definitions come directly from `QaChecklistCatalog.Definitions`. The form copies the catalog references into one form-owned definition snapshot, creates one existing Phase 2 `QaCheckResult` for every definition, and then dynamically creates one `QaChecklistItemControl` per definition after `InitializeComponent()`.
 
-No checklist ID, display name, description, section, or applicability rule is copied into a designer or second catalog. Each item reads `DisplayName` and `Description` from its bound `QaCheckDefinition`. `QaCheckDefinition.Section` places 21 definitions on Raw File QA and 7 on DB QA.
+No checklist ID, display name, description, section, or applicability rule is copied into a designer or second catalog. Each item reads `DisplayName` and `Description` from its bound `QaCheckDefinition`. In the current active catalog, `QaCheckDefinition.Section` places 22 definitions on Raw File QA and 7 on DB QA.
 
 Every initial result has:
 
@@ -221,7 +223,7 @@ Initial applicability then changes conditional inactive rows to `NotApplicable`.
 
 Construction fails fast unless all of these invariants hold:
 
-- the catalog contains the expected 28 definitions;
+- the current active catalog contains the expected 29 definitions;
 - no definition is `null`;
 - every catalog ID is nonblank and unique using ordinal comparison;
 - every result ID is nonblank and unique;
@@ -321,8 +323,8 @@ PASS: 351 assertions completed.
 
 The harness used unique operating-system temporary QA and V1 documentation roots. Synthetic PMS, hotel, QA, and V1 data were confined to those roots. It directly verified:
 
-- one real `QaReport`, safe Phase 2 defaults, all 28 unique stable IDs, 21 Raw plus 7 DB grouping, catalog display names/descriptions, and Manual source;
-- the initial 22 applicable/`NotEvaluated` and 6 hidden/`NotApplicable` results;
+- at the historical Phase 5 checkpoint, one real `QaReport`, safe Phase 2 defaults, all then-active 28 unique stable IDs, 21 Raw plus 7 DB grouping, catalog display names/descriptions, and Manual source;
+- at that historical checkpoint, the initial 22 applicable/`NotEvaluated` and 6 hidden/`NotApplicable` results;
 - Hotel ID and Hotel Name search, unmatched filtering, actual metadata-object binding, canonical PMS, clearing, and preferred-ID preservation;
 - read-only Hotel ID/PMS displays and atomic report synchronization;
 - January/December File Month values, `yyyy-MM` output, and independence from `DateOnly` QA Date;
@@ -383,7 +385,7 @@ The offscreen harness programmatically exercised controls and real owned modal f
 
 Phase 5 intentionally defers all outcome-generation and persistence behavior. Subsequent phases, beginning with Phase 6, remain responsible for warning/failure finding generation, `QaFinding` UI and resolution, custom-script handling, statistics input/calculation, report-status calculation, completion validation, Created By generation policy, Report ID generation, PDF selection/generation/saving, report persistence and overwrite handling, paired Hotel/PMS report output, QA index writing, and any raw-file, spreadsheet, database, diagnostic, or background processing.
 
-Phase 6 can consume the already synchronized object through `QaReportForm.CurrentReport`. After an owned `ShowDialog` returns and before the `using` declaration disposes the form, a later workflow can inspect that same `QaReport` instance: selected hotel snapshot, `QaFileMonth`, `DateOnly` QA Date, optional text, file characteristics, and all 28 stable-ID `QaCheckResult` objects are already present. Phase 6 should extend that object rather than create another DTO or rebuild checklist results. It must add its own explicit completion/persistence decision; Phase 5's Close/Cancel behavior intentionally provides no save signal and currently discards the draft.
+Phase 6 can consume the already synchronized object through `QaReportForm.CurrentReport`. After an owned `ShowDialog` returns and before the `using` declaration disposes the form, a later workflow can inspect that same `QaReport` instance: selected hotel snapshot, `QaFileMonth`, `DateOnly` QA Date, optional text, file characteristics, and one stable-ID `QaCheckResult` for each of the 29 active definitions are already present. Phase 6 should extend that object rather than create another DTO or rebuild checklist results. It must add its own explicit completion/persistence decision; Phase 5's Close/Cancel behavior intentionally provides no save signal and currently discards the draft.
 
 ## Final scope confirmations
 
