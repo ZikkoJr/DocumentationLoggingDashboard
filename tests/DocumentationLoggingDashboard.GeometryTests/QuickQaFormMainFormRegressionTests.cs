@@ -13,8 +13,8 @@ namespace DocumentationLoggingDashboard.GeometryTests;
 
 /// <summary>
 /// Focused UI-contract coverage for the two dashboard QA entry points and the
-/// dedicated Quick QA form. Program.cs intentionally does not invoke this class;
-/// the shared harness owner can add one RunAll call with the other suites.
+/// dedicated Quick QA form. Program.cs invokes <see cref="RunAll"/> with the
+/// other semantic suites.
 /// </summary>
 internal static class QuickQaFormMainFormRegressionTests
 {

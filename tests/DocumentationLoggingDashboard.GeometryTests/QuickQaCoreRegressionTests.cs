@@ -7,8 +7,8 @@ namespace DocumentationLoggingDashboard.GeometryTests;
 
 /// <summary>
 /// Focused semantic coverage for the fixed Quick QA catalog, findings, status,
-/// Summary lifecycle, and pre-save validation. Program.cs intentionally does not
-/// invoke this class so harness wiring can be coordinated separately.
+/// Summary lifecycle, and pre-save validation. Program.cs invokes
+/// <see cref="RunAll"/> with the other semantic suites.
 /// </summary>
 internal static class QuickQaCoreRegressionTests
 {

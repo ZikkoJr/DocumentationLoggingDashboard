@@ -10,8 +10,7 @@ namespace DocumentationLoggingDashboard.GeometryTests;
 
 /// <summary>
 /// Focused, additive coverage for the post-pilot Detailed QA contract. Program.cs
-/// intentionally does not invoke this class so concurrent harness wiring can remain
-/// isolated; add one RunAll call beside the other semantic suites.
+/// invokes <see cref="RunAll"/> with the other semantic suites.
 /// </summary>
 internal static class QaDetailedPostPilotRegressionTests
 {

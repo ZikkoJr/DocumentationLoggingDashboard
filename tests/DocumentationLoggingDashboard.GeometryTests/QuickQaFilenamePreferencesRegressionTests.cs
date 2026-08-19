@@ -5,9 +5,8 @@ namespace DocumentationLoggingDashboard.GeometryTests;
 
 /// <summary>
 /// Focused regression coverage for Quick QA filename, preference, and storage
-/// foundations. This class is intentionally unhooked; invoke <see cref="RunAll"/>
-/// from Program.cs beside the other semantic suites when the shared harness is
-/// ready to own it.
+/// foundations. Program.cs invokes <see cref="RunAll"/> with the other semantic
+/// suites.
 /// </summary>
 internal static class QuickQaFilenamePreferencesRegressionTests
 {

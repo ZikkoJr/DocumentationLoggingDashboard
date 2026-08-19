@@ -8,7 +8,8 @@ namespace DocumentationLoggingDashboard.GeometryTests;
 
 /// <summary>
 /// End-to-end synthetic coverage for Quick QA workbook schemas and the paired
-/// Surface/Hotel-history transaction. Program.cs intentionally remains unmodified.
+/// Surface/Hotel-history transaction. Program.cs invokes <see cref="RunAll"/>
+/// with the other semantic suites.
 /// </summary>
 internal static class QuickQaWorkbookSaveRegressionTests
 {
