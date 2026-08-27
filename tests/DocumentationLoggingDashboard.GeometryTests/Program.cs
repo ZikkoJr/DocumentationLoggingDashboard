@@ -20,6 +20,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaStatisticsControlGeometryTests.RunAll(Console.Out);
@@ -27,6 +28,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaBlankBrokenStatisticsRegressionTests.RunAll(Console.Out);
@@ -34,6 +36,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaDetailedPostPilotRegressionTests.RunAll(Console.Out);
@@ -41,6 +44,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QuickQaCoreRegressionTests.RunAll(Console.Out);
@@ -48,6 +52,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QuickQaFilenamePreferencesRegressionTests.RunAll(
@@ -56,12 +61,14 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QuickQaWorkbookSaveRegressionTests.RunAll(Console.Out);
             int quickFormMainFormResult = options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QuickQaFormMainFormRegressionTests.RunAll(Console.Out);
@@ -69,6 +76,7 @@ internal static class Program
                 || options.SemanticOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmokeOnly
                 ? 0
                 : QaArrivalMonthRegressionTests.RunAll(
@@ -78,6 +86,7 @@ internal static class Program
                 || options.ArrivalMonthOnly
                 || options.DeferredOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmoke
                 ? 0
                 : QaBlankBrokenSavePdfIndexEvidenceTests.RunAll(
@@ -87,6 +96,7 @@ internal static class Program
                 || options.SemanticOnly
                 || options.ArrivalMonthOnly
                 || options.V1Only
+                || options.DocumentationLogsOnly
                 || options.VisibleSmoke
                     ? 0
                     : QaDeferredTextCommitRegressionTests.RunAll(Console.Out);
@@ -97,6 +107,27 @@ internal static class Program
                 || options.VisibleSmoke
                     ? 0
                     : V1SyntheticRegressionTests.RunAll(Console.Out);
+            bool skipDocumentationLogSuites = options.GeometryOnly
+                || options.SemanticOnly
+                || options.ArrivalMonthOnly
+                || options.DeferredOnly
+                || options.V1Only
+                || options.VisibleSmokeOnly;
+            int documentationHotelIdParserResult = skipDocumentationLogSuites
+                ? 0
+                : DocumentationLogHotelIdParserRegressionTests.RunAll(Console.Out);
+            int documentationWorkbookResult = skipDocumentationLogSuites
+                ? 0
+                : DocumentationLogWorkbookRegressionTests.RunAll(Console.Out);
+            int documentationSequenceIndexResult = skipDocumentationLogSuites
+                ? 0
+                : DocumentationLogSequenceIndexRegressionTests.RunAll(Console.Out);
+            int documentationTransactionResult = skipDocumentationLogSuites
+                ? 0
+                : DocumentationLogSaveTransactionRegressionTests.RunAll(Console.Out);
+            int documentationMainFormResult = skipDocumentationLogSuites
+                ? 0
+                : DocumentationLogMainFormRegressionTests.RunAll(Console.Out);
             int result = geometryResult == 0
                 && semanticResult == 0
                 && detailedPostPilotResult == 0
@@ -108,6 +139,11 @@ internal static class Program
                 && saveEvidenceResult == 0
                 && deferredTextResult == 0
                 && v1Result == 0
+                && documentationHotelIdParserResult == 0
+                && documentationWorkbookResult == 0
+                && documentationSequenceIndexResult == 0
+                && documentationTransactionResult == 0
+                && documentationMainFormResult == 0
                     ? 0
                     : 1;
             if (result != 0 || !options.VisibleSmoke)
@@ -137,7 +173,7 @@ internal static class Program
         writer.WriteLine(
             "Usage: dotnet run --project tests/DocumentationLoggingDashboard.GeometryTests " +
             "[--geometry-only | --semantic-only | --arrival-month-only | " +
-            "--deferred-only | --v1-only] " +
+            "--deferred-only | --v1-only | --documentation-logs-only] " +
             "[--save-evidence-dir <absolute-external-parent>] " +
             "[(--visible-smoke | --visible-smoke-only) " +
             "--screenshot-dir <absolute-external-directory>]");
@@ -158,6 +194,7 @@ internal sealed record GeometryTestOptions(
     bool ArrivalMonthOnly,
     bool DeferredOnly,
     bool V1Only,
+    bool DocumentationLogsOnly,
     string? SaveEvidenceDirectory)
 {
     public static GeometryTestOptions Parse(string[] args)
@@ -170,6 +207,7 @@ internal sealed record GeometryTestOptions(
         bool arrivalMonthOnly = false;
         bool deferredOnly = false;
         bool v1Only = false;
+        bool documentationLogsOnly = false;
         string? screenshotDirectory = null;
         string? saveEvidenceDirectory = null;
 
@@ -198,6 +236,9 @@ internal sealed record GeometryTestOptions(
                     break;
                 case "--v1-only":
                     v1Only = true;
+                    break;
+                case "--documentation-logs-only":
+                    documentationLogsOnly = true;
                     break;
                 case "--screenshot-dir" when index + 1 < args.Length:
                     screenshotDirectory = args[++index];
@@ -228,11 +269,12 @@ internal sealed record GeometryTestOptions(
             + (semanticOnly ? 1 : 0)
             + (arrivalMonthOnly ? 1 : 0)
             + (deferredOnly ? 1 : 0)
-            + (v1Only ? 1 : 0) > 1)
+            + (v1Only ? 1 : 0)
+            + (documentationLogsOnly ? 1 : 0) > 1)
         {
             throw new ArgumentException(
                 "--geometry-only, --semantic-only, --arrival-month-only, " +
-                "--deferred-only, and --v1-only cannot be combined.");
+                "--deferred-only, --v1-only, and --documentation-logs-only cannot be combined.");
         }
 
         if (visibleSmoke && semanticOnly)
@@ -259,6 +301,12 @@ internal sealed record GeometryTestOptions(
                 "Visible smoke mode cannot be combined with --v1-only.");
         }
 
+        if (visibleSmoke && documentationLogsOnly)
+        {
+            throw new ArgumentException(
+                "Visible smoke mode cannot be combined with --documentation-logs-only.");
+        }
+
         if (visibleSmokeOnly && geometryOnly)
         {
             throw new ArgumentException(
@@ -277,6 +325,12 @@ internal sealed record GeometryTestOptions(
                 "--save-evidence-dir cannot be combined with --v1-only.");
         }
 
+        if (saveEvidenceDirectory is not null && documentationLogsOnly)
+        {
+            throw new ArgumentException(
+                "--save-evidence-dir cannot be combined with --documentation-logs-only.");
+        }
+
         if (saveEvidenceDirectory is not null && visibleSmoke)
         {
             throw new ArgumentException(
@@ -293,6 +347,7 @@ internal sealed record GeometryTestOptions(
             arrivalMonthOnly,
             deferredOnly,
             v1Only,
+            documentationLogsOnly,
             saveEvidenceDirectory);
     }
 }

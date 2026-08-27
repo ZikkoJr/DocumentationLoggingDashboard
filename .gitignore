@@ -16,6 +16,9 @@ obj/
 # Published/runtime output
 PublishedApp/
 DocumentationLogs/
+!DocumentationLoggingDashboard/DocumentationLogs/
+DocumentationLoggingDashboard/DocumentationLogs/*
+!DocumentationLoggingDashboard/DocumentationLogs/*.cs
 user-settings.json
 
 # Logs and diagnostics

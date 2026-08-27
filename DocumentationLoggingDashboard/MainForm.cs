@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using DocumentationLoggingDashboard.DocumentationLogs;
 using DocumentationLoggingDashboard.Models;
 using DocumentationLoggingDashboard.QAReports.Forms;
+using DocumentationLoggingDashboard.QAReports.Forms.Controls;
 using DocumentationLoggingDashboard.QAReports.Models;
 using DocumentationLoggingDashboard.QAReports.Services;
 using DocumentationLoggingDashboard.Services;
@@ -12,21 +14,33 @@ public partial class MainForm : Form
     private readonly LogTemplateService logTemplateService = new();
     private readonly SettingsService settingsService = new();
     private readonly LogFileService logFileService;
-    private readonly LogIdService logIdService;
-    private readonly LogIndexService logIndexService;
-    private readonly Dictionary<LogFieldDefinition, TextBox> fieldInputs = new();
+    private readonly Dictionary<DocumentationLogFormFieldDefinition, TextBox> fieldInputs = new();
+    private readonly DocumentationLogPreviewFormatter documentationLogPreviewFormatter = new();
+
+    private DocumentationLogStoragePaths? documentationLogPaths;
+    private DocumentationLogWorkbookFilenameService? documentationLogFilenameService;
+    private DocumentationLogWorkbookService? documentationLogWorkbookService;
+    private DocumentationLogWorkbookPreferencesService? documentationLogPreferencesService;
+    private DocumentationLogSaveService? documentationLogSaveService;
+    private IReadOnlyList<QaHotelMetadata> documentationLogHotels = Array.Empty<QaHotelMetadata>();
+    private IReadOnlyList<QaPmsMetadata> documentationLogPmsSystems = Array.Empty<QaPmsMetadata>();
+    private QaHotelSelectorControl? debuggingHotelSelectorControl;
+    private TextBox? debuggingHotelNameTextBox;
+    private TextBox? debuggingHotelIdTextBox;
+    private TextBox? debuggingPmsTextBox;
+    private Exception? documentationLogInitializationError;
+    private bool isRefreshingRunningWorkbookChoices;
+    private bool isSavingDocumentationLog;
 
     public MainForm()
     {
         logFileService = new LogFileService(settingsService, logTemplateService);
-        logIdService = new LogIdService(logTemplateService, logFileService);
-        logIndexService = new LogIndexService(logFileService, logTemplateService);
 
         InitializeComponent();
-        ConfigureLogTypeDropdown();
         WireButtonEvents();
+        InitializeDocumentationLogWorkflow();
+        ConfigureLogTypeDropdown();
         RefreshDocumentationRootFolderDisplay();
-        RenderFieldsForSelectedLogType();
     }
 
     private void ConfigureLogTypeDropdown()
@@ -39,7 +53,8 @@ public partial class MainForm : Form
             logTypeComboBox.Items.Add(new LogTypeOption(logType, logTemplateService.GetDisplayName(logType)));
         }
 
-        logTypeComboBox.SelectedIndexChanged += (_, _) => RenderFieldsForSelectedLogType();
+        logTypeComboBox.SelectedIndexChanged += (_, _) =>
+            HandleSelectedLogTypeChanged();
         logTypeComboBox.SelectedIndex = 0;
     }
 
@@ -48,7 +63,10 @@ public partial class MainForm : Form
         previewEntryButton.Click += (_, _) => PreviewEntry();
         submitEntryButton.Click += (_, _) => SubmitEntry();
         clearFormButton.Click += (_, _) => ClearForm();
-        openTodaysLogFileButton.Click += (_, _) => OpenTodaysLogFile();
+        openSelectedLogWorkbookButton.Click += (_, _) => OpenSelectedLogWorkbook();
+        createNewLogFileButton.Click += (_, _) => CreateNewLogFile();
+        runningWorkbookComboBox.SelectedIndexChanged += (_, _) =>
+            SaveSelectedRunningWorkbookPreference();
         openLogsFolderButton.Click += (_, _) => OpenLogsFolder();
         openLogIndexButton.Click += (_, _) => OpenLogIndex();
         changeLogsFolderButton.Click += (_, _) => ChangeLogsFolder();
@@ -61,12 +79,34 @@ public partial class MainForm : Form
     private void RenderFieldsForSelectedLogType()
     {
         fieldsTableLayoutPanel.SuspendLayout();
+
+        Control[] previousControls = fieldsTableLayoutPanel.Controls
+            .Cast<Control>()
+            .ToArray();
         fieldsTableLayoutPanel.Controls.Clear();
+
+        foreach (Control control in previousControls)
+        {
+            control.Dispose();
+        }
+
         fieldsTableLayoutPanel.RowStyles.Clear();
         fieldsTableLayoutPanel.RowCount = 0;
         fieldInputs.Clear();
+        debuggingHotelSelectorControl = null;
+        debuggingHotelNameTextBox = null;
+        debuggingHotelIdTextBox = null;
+        debuggingPmsTextBox = null;
 
-        foreach (LogFieldDefinition field in logTemplateService.GetFields(GetSelectedLogType()))
+        DocumentationLogFormContract contract =
+            DocumentationLogWorkbookSchema.GetFormContract(GetSelectedLogType());
+
+        if (contract.UsesHotelSelector)
+        {
+            AddDebuggingHotelRows();
+        }
+
+        foreach (DocumentationLogFormFieldDefinition field in contract.Fields)
         {
             AddFieldRow(field);
         }
@@ -75,20 +115,42 @@ public partial class MainForm : Form
         previewTextBox.Clear();
     }
 
-    private void AddFieldRow(LogFieldDefinition field)
+    private void AddDebuggingHotelRows()
     {
-        int rowIndex = fieldsTableLayoutPanel.RowCount++;
-        fieldsTableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-        Label label = new()
+        QaHotelSelectorControl selector = new()
         {
-            AutoSize = true,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 7, 12, 6),
-            Text = field.IsRequired ? $"{field.Label} *" : field.Label,
-            TextAlign = ContentAlignment.TopLeft
+            Margin = new Padding(0, 3, 0, 10),
+            Height = 220,
+            MinimumSize = new Size(300, 180)
         };
+        selector.SelectedHotelChanged += (_, _) =>
+            UpdateDebuggingHotelContext();
+        selector.SetHotels(documentationLogHotels, preferredHotelId: string.Empty);
+        debuggingHotelSelectorControl = selector;
+        AddControlRow("Hotel *", selector, height: 230);
 
+        debuggingHotelNameTextBox = AddReadOnlyContextRow("Hotel Name");
+        debuggingHotelIdTextBox = AddReadOnlyContextRow("Hotel ID");
+        debuggingPmsTextBox = AddReadOnlyContextRow("PMS");
+        UpdateDebuggingHotelContext();
+    }
+
+    private TextBox AddReadOnlyContextRow(string label)
+    {
+        TextBox textBox = new()
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 3, 0, 8),
+            ReadOnly = true,
+            TabStop = false
+        };
+        AddControlRow(label, textBox);
+        return textBox;
+    }
+
+    private void AddFieldRow(DocumentationLogFormFieldDefinition field)
+    {
         TextBox textBox = new()
         {
             Dock = DockStyle.Fill,
@@ -97,22 +159,68 @@ public partial class MainForm : Form
             ScrollBars = field.IsMultiline ? ScrollBars.Vertical : ScrollBars.None,
             Height = field.IsMultiline ? 84 : 27
         };
-
-        fieldsTableLayoutPanel.Controls.Add(label, 0, rowIndex);
-        fieldsTableLayoutPanel.Controls.Add(textBox, 1, rowIndex);
+        AddControlRow(
+            field.IsRequired ? $"{field.Label} *" : field.Label,
+            textBox,
+            field.IsMultiline ? 95 : null);
         fieldInputs[field] = textBox;
+    }
+
+    private void AddControlRow(string labelText, Control control, int? height = null)
+    {
+        int rowIndex = fieldsTableLayoutPanel.RowCount++;
+        fieldsTableLayoutPanel.RowStyles.Add(height.HasValue
+            ? new RowStyle(SizeType.Absolute, height.Value)
+            : new RowStyle(SizeType.AutoSize));
+
+        Label label = new()
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 7, 12, 6),
+            Text = labelText,
+            TextAlign = ContentAlignment.TopLeft
+        };
+        fieldsTableLayoutPanel.Controls.Add(label, 0, rowIndex);
+        fieldsTableLayoutPanel.Controls.Add(control, 1, rowIndex);
+    }
+
+    private void UpdateDebuggingHotelContext()
+    {
+        QaHotelMetadata? hotel = debuggingHotelSelectorControl?.SelectedHotel;
+
+        if (debuggingHotelNameTextBox is not null)
+        {
+            debuggingHotelNameTextBox.Text = hotel?.HotelName ?? string.Empty;
+        }
+
+        if (debuggingHotelIdTextBox is not null)
+        {
+            debuggingHotelIdTextBox.Text = hotel?.HotelId ?? string.Empty;
+        }
+
+        if (debuggingPmsTextBox is not null)
+        {
+            debuggingPmsTextBox.Text = hotel?.PmsName ?? string.Empty;
+        }
     }
 
     private void PreviewEntry()
     {
-        if (!ValidateRequiredFields())
+        if (!ValidateRequiredFields() || !EnsureDocumentationLogWorkflowAvailable())
         {
             return;
         }
 
         try
         {
-            UpdatePreview();
+            DocumentationLogEvent preview = documentationLogSaveService!
+                .CreatePreview(BuildDocumentationLogSaveRequest());
+            previewTextBox.Text = documentationLogPreviewFormatter.Format(preview);
+        }
+        catch (DocumentationLogSaveException ex)
+        {
+            ShowDocumentationLogSaveError("Preview could not be generated", ex);
         }
         catch (Exception ex)
         {
@@ -122,59 +230,57 @@ public partial class MainForm : Form
 
     private void SubmitEntry()
     {
-        if (!ValidateRequiredFields())
+        if (isSavingDocumentationLog
+            || !ValidateRequiredFields()
+            || !EnsureDocumentationLogWorkflowAvailable())
         {
             return;
         }
 
+        isSavingDocumentationLog = true;
+        submitEntryButton.Enabled = false;
+
         try
         {
-            DateTime entryDateTime = DateTime.Now;
-            LogEntry entry = BuildLogEntryFromInputs(logIdService.GenerateNextLogId(GetSelectedLogType(), entryDateTime), entryDateTime);
-            string formattedEntry = logTemplateService.FormatEntry(entry);
-            string savedFilePath = logFileService.SaveEntry(entry, formattedEntry);
-            string indexFilePath;
+            DocumentationLogSaveResult result = documentationLogSaveService!
+                .Save(BuildDocumentationLogSaveRequest());
+            SaveSelectedRunningWorkbookPreference();
+            string formattedPreview = documentationLogPreviewFormatter.Format(result.Event);
+            RenderFieldsForSelectedLogType();
+            previewTextBox.Text = formattedPreview;
 
-            try
-            {
-                indexFilePath = logIndexService.AppendEntry(entry, savedFilePath);
-            }
-            catch (Exception ex)
-            {
-                previewTextBox.Text = formattedEntry;
-                MessageBox.Show(
-                    $"Entry was saved to the daily log, but the index could not be updated.\r\n\r\nDaily log: {savedFilePath}\r\n\r\nIndex error: {ex.Message}",
-                    "Index Update Failed",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-
-                ClearForm();
-                return;
-            }
-
-            previewTextBox.Text = formattedEntry;
+            string cleanupNotice = string.IsNullOrWhiteSpace(result.CleanupWarning)
+                ? string.Empty
+                : $"\r\n\r\nCleanup warning: {result.CleanupWarning}";
             MessageBox.Show(
-                $"Entry saved successfully.\r\n\r\nDaily log: {savedFilePath}\r\n\r\nIndex updated: {indexFilePath}",
+                $"Entry saved successfully.\r\n\r\n"
+                + $"Running workbook: {result.RunningWorkbookPath}\r\n"
+                + $"Hotel histories updated: {result.HotelHistoryPaths.Count}\r\n"
+                + $"PMS histories updated: {result.PmsHistoryPaths.Count}\r\n"
+                + $"Index updated: {result.IndexPath}"
+                + cleanupNotice,
                 "Entry Saved",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
-
-            ClearForm();
+        }
+        catch (DocumentationLogSaveException ex)
+        {
+            ShowDocumentationLogSaveError("Entry was not saved", ex);
         }
         catch (Exception ex)
         {
             ShowError("Failed to save entry.", ex);
         }
+        finally
+        {
+            isSavingDocumentationLog = false;
+            submitEntryButton.Enabled = documentationLogSaveService is not null;
+        }
     }
 
     private void ClearForm()
     {
-        foreach (TextBox textBox in fieldInputs.Values)
-        {
-            textBox.Clear();
-        }
-
-        previewTextBox.Clear();
+        RenderFieldsForSelectedLogType();
     }
 
     private bool ValidateRequiredFields()
@@ -183,6 +289,17 @@ public partial class MainForm : Form
             .Where(fieldInput => fieldInput.Key.IsRequired && string.IsNullOrWhiteSpace(fieldInput.Value.Text))
             .Select(fieldInput => fieldInput.Key.Label)
             .ToList();
+
+        if (GetSelectedLogType() == LogType.DebuggingLog
+            && debuggingHotelSelectorControl?.SelectedHotel is null)
+        {
+            missingFields.Insert(0, "Hotel");
+        }
+
+        if (runningWorkbookComboBox.SelectedItem is not string)
+        {
+            missingFields.Insert(0, "Running Log Workbook");
+        }
 
         if (missingFields.Count == 0)
         {
@@ -198,56 +315,273 @@ public partial class MainForm : Form
         return false;
     }
 
-    private void UpdatePreview()
+    private DocumentationLogSaveRequest BuildDocumentationLogSaveRequest()
     {
-        DateTime previewDateTime = DateTime.Now;
-        string previewLogId = logIdService.GenerateNextLogId(GetSelectedLogType(), previewDateTime);
-        previewTextBox.Text = logTemplateService.FormatEntry(BuildLogEntryFromInputs(previewLogId, previewDateTime));
+        Dictionary<string, string> values = fieldInputs.ToDictionary(
+            pair => pair.Key.Key,
+            pair => pair.Value.Text,
+            StringComparer.Ordinal);
+        values.TryGetValue(
+            DocumentationLogFieldKeys.HotelIds,
+            out string? hotelIdsInput);
+        QaHotelMetadata? selectedHotel = debuggingHotelSelectorControl?.SelectedHotel;
+        QaPmsMetadata? selectedPms = selectedHotel is null
+            ? null
+            : documentationLogPmsSystems.SingleOrDefault(pms =>
+                pms.PmsName.Equals(
+                    selectedHotel.PmsName,
+                    StringComparison.OrdinalIgnoreCase));
+
+        return new DocumentationLogSaveRequest(
+            GetSelectedLogType(),
+            (string)runningWorkbookComboBox.SelectedItem!,
+            values,
+            selectedHotel,
+            selectedPms,
+            hotelIdsInput);
     }
 
-    private LogEntry BuildLogEntryFromInputs(string logId, DateTime dateTime)
+    private bool EnsureDocumentationLogWorkflowAvailable()
     {
-        LogEntry entry = new()
+        if (documentationLogSaveService is not null)
         {
-            LogType = GetSelectedLogType(),
-            LogId = logId,
-            DateTime = dateTime
-        };
-
-        foreach ((LogFieldDefinition field, TextBox textBox) in fieldInputs)
-        {
-            string value = textBox.Text.Trim();
-
-            if (field.Key == LogTemplateService.CreatedByKey)
-            {
-                entry.CreatedBy = value;
-            }
-            else if (field.Key == LogTemplateService.NotesFollowUpKey)
-            {
-                entry.NotesFollowUp = value;
-            }
-            else
-            {
-                entry.FieldValues[field.Key] = value;
-            }
+            return true;
         }
 
-        return entry;
+        ShowError(
+            "The Excel documentation-log workflow is unavailable.",
+            documentationLogInitializationError
+                ?? new InvalidOperationException(
+                    "The documentation-log services were not initialized."));
+        return false;
     }
 
-    private void OpenTodaysLogFile()
+    private void HandleSelectedLogTypeChanged()
+    {
+        RenderFieldsForSelectedLogType();
+        RefreshRunningWorkbookChoices();
+    }
+
+    private void InitializeDocumentationLogWorkflow()
+    {
+        documentationLogPaths = null;
+        documentationLogFilenameService = null;
+        documentationLogWorkbookService = null;
+        documentationLogPreferencesService = null;
+        documentationLogSaveService = null;
+        documentationLogHotels = Array.Empty<QaHotelMetadata>();
+        documentationLogPmsSystems = Array.Empty<QaPmsMetadata>();
+
+        try
+        {
+            string documentationRoot = settingsService.GetDocumentationRootFolder();
+            QaStoragePaths qaPaths = new(documentationRoot);
+            new QaStorageInitializer(qaPaths).Initialize();
+            QaMetadataService metadataService = new(
+                qaPaths,
+                new QaFolderNameSanitizer());
+            DocumentationLogStoragePaths paths = new(qaPaths);
+            paths.EnsureBaseDirectories();
+            DocumentationLogWorkbookFilenameService filenameService =
+                new(paths);
+            DocumentationLogWorkbookService workbookService = new(paths);
+            DocumentationLogWorkbookPreferencesService preferencesService =
+                new(paths, filenameService);
+            DocumentationLogSaveService saveService = new(
+                paths,
+                metadataService);
+            IReadOnlyList<QaPmsMetadata> pmsSystems =
+                metadataService.LoadPmsSystems();
+            IReadOnlyList<QaHotelMetadata> hotels = metadataService.LoadHotels();
+
+            documentationLogPaths = paths;
+            documentationLogFilenameService = filenameService;
+            documentationLogWorkbookService = workbookService;
+            documentationLogPreferencesService = preferencesService;
+            documentationLogSaveService = saveService;
+            documentationLogPmsSystems = pmsSystems;
+            documentationLogHotels = hotels;
+            documentationLogInitializationError = null;
+        }
+        catch (Exception ex)
+        {
+            documentationLogInitializationError = ex;
+        }
+
+        bool available = documentationLogSaveService is not null;
+        previewEntryButton.Enabled = available;
+        submitEntryButton.Enabled = available;
+        createNewLogFileButton.Enabled = documentationLogWorkbookService is not null;
+    }
+
+    private void RefreshRunningWorkbookChoices(string? preferredFileName = null)
+    {
+        isRefreshingRunningWorkbookChoices = true;
+
+        try
+        {
+            runningWorkbookComboBox.Items.Clear();
+
+            if (documentationLogWorkbookService is null)
+            {
+                runningWorkbookComboBox.Enabled = false;
+                openSelectedLogWorkbookButton.Enabled = false;
+                return;
+            }
+
+            IReadOnlyList<string> fileNames = documentationLogWorkbookService
+                .GetCompatibleRunningWorkbookFileNames(GetSelectedLogType());
+
+            foreach (string fileName in fileNames)
+            {
+                runningWorkbookComboBox.Items.Add(fileName);
+            }
+
+            string? rememberedFileName = null;
+            try
+            {
+                rememberedFileName = documentationLogPreferencesService?
+                    .LoadLastUsedWorkbookFileName(GetSelectedLogType());
+            }
+            catch (DocumentationLogWorkbookPreferencesException ex)
+            {
+                Debug.WriteLine(ex);
+            }
+
+            string? selectedFileName = FindAvailableWorkbook(
+                fileNames,
+                preferredFileName)
+                ?? FindAvailableWorkbook(fileNames, rememberedFileName)
+                ?? fileNames.FirstOrDefault();
+            runningWorkbookComboBox.SelectedItem = selectedFileName;
+            runningWorkbookComboBox.Enabled = true;
+            openSelectedLogWorkbookButton.Enabled = selectedFileName is not null;
+        }
+        catch (Exception ex)
+        {
+            documentationLogInitializationError = ex;
+            runningWorkbookComboBox.Items.Clear();
+            runningWorkbookComboBox.Enabled = true;
+            openSelectedLogWorkbookButton.Enabled = false;
+        }
+        finally
+        {
+            isRefreshingRunningWorkbookChoices = false;
+        }
+    }
+
+    private static string? FindAvailableWorkbook(
+        IReadOnlyList<string> fileNames,
+        string? requestedFileName)
+    {
+        if (string.IsNullOrWhiteSpace(requestedFileName))
+        {
+            return null;
+        }
+
+        return fileNames.FirstOrDefault(fileName => fileName.Equals(
+            requestedFileName,
+            StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void SaveSelectedRunningWorkbookPreference()
+    {
+        if (isRefreshingRunningWorkbookChoices
+            || runningWorkbookComboBox.SelectedItem is not string fileName
+            || documentationLogPreferencesService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            documentationLogPreferencesService.SaveLastUsedWorkbookFileName(
+                GetSelectedLogType(),
+                fileName);
+            openSelectedLogWorkbookButton.Enabled = true;
+        }
+        catch (DocumentationLogWorkbookPreferencesException ex)
+        {
+            Debug.WriteLine(ex);
+            MessageBox.Show(
+                this,
+                "The selected workbook is available, but its last-used preference could not be saved.",
+                "Workbook Preference Not Saved",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private void CreateNewLogFile()
+    {
+        if (documentationLogWorkbookService is null)
+        {
+            _ = EnsureDocumentationLogWorkflowAvailable();
+            return;
+        }
+
+        using DocumentationLogWorkbookNameForm form = new(
+            $"{DocumentationLogWorkbookSchema.GetDisplayName(GetSelectedLogType())} Running");
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            string fileName = documentationLogWorkbookService
+                .CreateNewRunningWorkbook(
+                    GetSelectedLogType(),
+                    form.RequestedFileName);
+            RefreshRunningWorkbookChoices(fileName);
+            runningWorkbookComboBox.SelectedItem = fileName;
+            SaveSelectedRunningWorkbookPreference();
+        }
+        catch (DocumentationLogWorkbookException ex)
+        {
+            MessageBox.Show(
+                this,
+                ex.Message,
+                "Log Workbook Not Created",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            ShowError("Failed to create the Running log workbook.", ex);
+        }
+    }
+
+    private void OpenSelectedLogWorkbook()
     {
         try
         {
-            string filePath = logFileService.GetDailyLogFilePath(GetSelectedLogType(), DateTime.Now);
+            if (runningWorkbookComboBox.SelectedItem is not string fileName
+                || documentationLogPaths is null
+                || documentationLogFilenameService is null)
+            {
+                MessageBox.Show(
+                    "Select or create a compatible Running log workbook first.",
+                    "Log Workbook Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            string safeFileName = documentationLogFilenameService
+                .ValidateStoredWorkbookFileName(fileName);
+            string filePath = documentationLogPaths.ResolveRunningWorkbookPath(
+                GetSelectedLogType(),
+                safeFileName);
 
             if (!File.Exists(filePath))
             {
                 MessageBox.Show(
-                    "Today's log file does not exist yet. Submit an entry first.",
-                    "Log File Not Found",
+                    "The selected Running log workbook no longer exists. Select or create another workbook.",
+                    "Log Workbook Not Found",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+                RefreshRunningWorkbookChoices();
                 return;
             }
 
@@ -255,7 +589,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            ShowError("Failed to open today's log file.", ex);
+            ShowError("Failed to open the selected log workbook.", ex);
         }
     }
 
@@ -263,7 +597,15 @@ public partial class MainForm : Form
     {
         try
         {
-            OpenPath(logFileService.EnsureDocumentationFolderStructure());
+            if (documentationLogPaths is not null)
+            {
+                documentationLogPaths.EnsureBaseDirectories();
+                OpenPath(documentationLogPaths.DocumentationRootPath);
+            }
+            else
+            {
+                OpenPath(logFileService.EnsureDocumentationFolderStructure());
+            }
         }
         catch (Exception ex)
         {
@@ -275,7 +617,8 @@ public partial class MainForm : Form
     {
         try
         {
-            string filePath = logIndexService.GetIndexFilePath();
+            string filePath = documentationLogPaths?.LogIndexFilePath
+                ?? Path.Combine(logFileService.GetIndexFolderPath(), "LogIndex.txt");
 
             if (!File.Exists(filePath))
             {
@@ -306,6 +649,8 @@ public partial class MainForm : Form
                 dependencies.PmsSystems,
                 dependencies.Hotels);
             form.ShowDialog(this);
+            InitializeDocumentationLogWorkflow();
+            HandleSelectedLogTypeChanged();
         }
         catch (QaUnsupportedMetadataSchemaException ex)
         {
@@ -547,6 +892,8 @@ public partial class MainForm : Form
         }
 
         RefreshDocumentationRootFolderDisplay();
+        InitializeDocumentationLogWorkflow();
+        HandleSelectedLogTypeChanged();
 
         MessageBox.Show(
             $"Logs folder updated successfully.\r\n\r\n{selectedFolder}",
@@ -581,6 +928,8 @@ public partial class MainForm : Form
         }
 
         RefreshDocumentationRootFolderDisplay();
+        InitializeDocumentationLogWorkflow();
+        HandleSelectedLogTypeChanged();
 
         MessageBox.Show(
             $"Logs folder reset successfully.\r\n\r\n{defaultFolder}",
@@ -612,6 +961,32 @@ public partial class MainForm : Form
         MessageBox.Show(
             this,
             message,
+            title,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
+    }
+
+    private void ShowDocumentationLogSaveError(
+        string title,
+        DocumentationLogSaveException exception)
+    {
+        Debug.WriteLine(exception);
+        string restorationText = exception.ManualReviewRequired
+            ? "\r\n\r\nRollback could not fully restore every destination. Manual review is required."
+            : exception.PreviousStateRestored
+                ? "\r\n\r\nThe previous file state was restored."
+                : string.Empty;
+        string locationText = exception.ManualReviewLocations.Count == 0
+            ? string.Empty
+            : "\r\n\r\nReview:\r\n"
+                + string.Join("\r\n", exception.ManualReviewLocations);
+        string affectedText = exception.AffectedPath is null
+            ? string.Empty
+            : $"\r\n\r\nAffected file: {exception.AffectedPath}";
+
+        MessageBox.Show(
+            this,
+            exception.Message + restorationText + affectedText + locationText,
             title,
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);

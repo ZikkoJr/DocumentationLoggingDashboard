@@ -22,6 +22,10 @@ partial class MainForm
     private Button detailedQaReportButton;
     private Button quickQaButton;
     private Button manageQaHotelsPmsButton;
+    private TableLayoutPanel runningWorkbookLayoutPanel;
+    private Label runningWorkbookLabel;
+    private ComboBox runningWorkbookComboBox;
+    private Button createNewLogFileButton;
     private SplitContainer contentSplitContainer;
     private Panel fieldsScrollPanel;
     private TableLayoutPanel fieldsTableLayoutPanel;
@@ -31,7 +35,7 @@ partial class MainForm
     private Button previewEntryButton;
     private Button submitEntryButton;
     private Button clearFormButton;
-    private Button openTodaysLogFileButton;
+    private Button openSelectedLogWorkbookButton;
     private Button openLogsFolderButton;
     private Button openLogIndexButton;
 
@@ -71,6 +75,10 @@ partial class MainForm
         detailedQaReportButton = new Button();
         quickQaButton = new Button();
         manageQaHotelsPmsButton = new Button();
+        runningWorkbookLayoutPanel = new TableLayoutPanel();
+        runningWorkbookLabel = new Label();
+        runningWorkbookComboBox = new ComboBox();
+        createNewLogFileButton = new Button();
         contentSplitContainer = new SplitContainer();
         fieldsScrollPanel = new Panel();
         fieldsTableLayoutPanel = new TableLayoutPanel();
@@ -80,13 +88,14 @@ partial class MainForm
         previewEntryButton = new Button();
         submitEntryButton = new Button();
         clearFormButton = new Button();
-        openTodaysLogFileButton = new Button();
+        openSelectedLogWorkbookButton = new Button();
         openLogsFolderButton = new Button();
         openLogIndexButton = new Button();
         mainLayoutPanel.SuspendLayout();
         documentationFolderLayoutPanel.SuspendLayout();
         logTypeLayoutPanel.SuspendLayout();
         qaActionFlowLayoutPanel.SuspendLayout();
+        runningWorkbookLayoutPanel.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)contentSplitContainer).BeginInit();
         contentSplitContainer.Panel1.SuspendLayout();
         contentSplitContainer.Panel2.SuspendLayout();
@@ -103,17 +112,19 @@ partial class MainForm
         mainLayoutPanel.Controls.Add(privacyReminderLabel, 0, 1);
         mainLayoutPanel.Controls.Add(documentationFolderLayoutPanel, 0, 2);
         mainLayoutPanel.Controls.Add(logTypeLayoutPanel, 0, 3);
-        mainLayoutPanel.Controls.Add(contentSplitContainer, 0, 4);
-        mainLayoutPanel.Controls.Add(buttonFlowLayoutPanel, 0, 5);
+        mainLayoutPanel.Controls.Add(runningWorkbookLayoutPanel, 0, 4);
+        mainLayoutPanel.Controls.Add(contentSplitContainer, 0, 5);
+        mainLayoutPanel.Controls.Add(buttonFlowLayoutPanel, 0, 6);
         mainLayoutPanel.Dock = DockStyle.Fill;
         mainLayoutPanel.Location = new Point(0, 0);
         mainLayoutPanel.Name = "mainLayoutPanel";
         mainLayoutPanel.Padding = new Padding(16);
-        mainLayoutPanel.RowCount = 6;
+        mainLayoutPanel.RowCount = 7;
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+        mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         mainLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
         mainLayoutPanel.Size = new Size(1100, 720);
@@ -286,11 +297,61 @@ partial class MainForm
         manageQaHotelsPmsButton.TabIndex = 2;
         manageQaHotelsPmsButton.Text = "Manage QA Hotels / PMS";
         manageQaHotelsPmsButton.UseVisualStyleBackColor = true;
+        //
+        // runningWorkbookLayoutPanel
+        //
+        runningWorkbookLayoutPanel.ColumnCount = 3;
+        runningWorkbookLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 178F));
+        runningWorkbookLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        runningWorkbookLayoutPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180F));
+        runningWorkbookLayoutPanel.Controls.Add(runningWorkbookLabel, 0, 0);
+        runningWorkbookLayoutPanel.Controls.Add(runningWorkbookComboBox, 1, 0);
+        runningWorkbookLayoutPanel.Controls.Add(createNewLogFileButton, 2, 0);
+        runningWorkbookLayoutPanel.Dock = DockStyle.Fill;
+        runningWorkbookLayoutPanel.Location = new Point(19, 213);
+        runningWorkbookLayoutPanel.Name = "runningWorkbookLayoutPanel";
+        runningWorkbookLayoutPanel.RowCount = 1;
+        runningWorkbookLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        runningWorkbookLayoutPanel.Size = new Size(1062, 42);
+        runningWorkbookLayoutPanel.TabIndex = 3;
+        //
+        // runningWorkbookLabel
+        //
+        runningWorkbookLabel.AutoSize = true;
+        runningWorkbookLabel.Dock = DockStyle.Fill;
+        runningWorkbookLabel.Location = new Point(3, 0);
+        runningWorkbookLabel.Name = "runningWorkbookLabel";
+        runningWorkbookLabel.Size = new Size(172, 42);
+        runningWorkbookLabel.TabIndex = 0;
+        runningWorkbookLabel.Text = "Running Log Workbook:";
+        runningWorkbookLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
+        // runningWorkbookComboBox
+        //
+        runningWorkbookComboBox.AccessibleName = "Running documentation log workbook";
+        runningWorkbookComboBox.Dock = DockStyle.Fill;
+        runningWorkbookComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+        runningWorkbookComboBox.FormattingEnabled = true;
+        runningWorkbookComboBox.Location = new Point(181, 9);
+        runningWorkbookComboBox.Margin = new Padding(3, 9, 8, 3);
+        runningWorkbookComboBox.Name = "runningWorkbookComboBox";
+        runningWorkbookComboBox.Size = new Size(695, 23);
+        runningWorkbookComboBox.TabIndex = 1;
+        //
+        // createNewLogFileButton
+        //
+        createNewLogFileButton.Location = new Point(887, 6);
+        createNewLogFileButton.Margin = new Padding(3, 6, 3, 3);
+        createNewLogFileButton.Name = "createNewLogFileButton";
+        createNewLogFileButton.Size = new Size(170, 30);
+        createNewLogFileButton.TabIndex = 2;
+        createNewLogFileButton.Text = "Create New Log File";
+        createNewLogFileButton.UseVisualStyleBackColor = true;
         // 
         // contentSplitContainer
         // 
         contentSplitContainer.Dock = DockStyle.Fill;
-        contentSplitContainer.Location = new Point(19, 213);
+        contentSplitContainer.Location = new Point(19, 261);
         contentSplitContainer.Name = "contentSplitContainer";
         // 
         // contentSplitContainer.Panel1
@@ -303,7 +364,7 @@ partial class MainForm
         contentSplitContainer.Panel2.Controls.Add(previewTextBox);
         contentSplitContainer.Panel2.Controls.Add(previewLabel);
         contentSplitContainer.Panel2MinSize = 300;
-        contentSplitContainer.Size = new Size(1062, 436);
+        contentSplitContainer.Size = new Size(1062, 388);
         contentSplitContainer.SplitterDistance = 512;
         contentSplitContainer.TabIndex = 2;
         // 
@@ -315,7 +376,7 @@ partial class MainForm
         fieldsScrollPanel.Location = new Point(0, 0);
         fieldsScrollPanel.Name = "fieldsScrollPanel";
         fieldsScrollPanel.Padding = new Padding(0, 0, 12, 0);
-        fieldsScrollPanel.Size = new Size(512, 436);
+        fieldsScrollPanel.Size = new Size(512, 388);
         fieldsScrollPanel.TabIndex = 0;
         // 
         // fieldsTableLayoutPanel
@@ -353,7 +414,7 @@ partial class MainForm
         previewTextBox.Name = "previewTextBox";
         previewTextBox.ReadOnly = true;
         previewTextBox.ScrollBars = ScrollBars.Vertical;
-        previewTextBox.Size = new Size(546, 409);
+        previewTextBox.Size = new Size(546, 361);
         previewTextBox.TabIndex = 1;
         // 
         // buttonFlowLayoutPanel
@@ -361,7 +422,7 @@ partial class MainForm
         buttonFlowLayoutPanel.Controls.Add(previewEntryButton);
         buttonFlowLayoutPanel.Controls.Add(submitEntryButton);
         buttonFlowLayoutPanel.Controls.Add(clearFormButton);
-        buttonFlowLayoutPanel.Controls.Add(openTodaysLogFileButton);
+        buttonFlowLayoutPanel.Controls.Add(openSelectedLogWorkbookButton);
         buttonFlowLayoutPanel.Controls.Add(openLogsFolderButton);
         buttonFlowLayoutPanel.Controls.Add(openLogIndexButton);
         buttonFlowLayoutPanel.Dock = DockStyle.Fill;
@@ -401,19 +462,19 @@ partial class MainForm
         clearFormButton.Text = "Clear Form";
         clearFormButton.UseVisualStyleBackColor = true;
         // 
-        // openTodaysLogFileButton
+        // openSelectedLogWorkbookButton
         // 
-        openTodaysLogFileButton.Location = new Point(351, 8);
-        openTodaysLogFileButton.Margin = new Padding(3, 8, 8, 3);
-        openTodaysLogFileButton.Name = "openTodaysLogFileButton";
-        openTodaysLogFileButton.Size = new Size(150, 30);
-        openTodaysLogFileButton.TabIndex = 3;
-        openTodaysLogFileButton.Text = "Open Today's Log File";
-        openTodaysLogFileButton.UseVisualStyleBackColor = true;
+        openSelectedLogWorkbookButton.Location = new Point(351, 8);
+        openSelectedLogWorkbookButton.Margin = new Padding(3, 8, 8, 3);
+        openSelectedLogWorkbookButton.Name = "openSelectedLogWorkbookButton";
+        openSelectedLogWorkbookButton.Size = new Size(190, 30);
+        openSelectedLogWorkbookButton.TabIndex = 3;
+        openSelectedLogWorkbookButton.Text = "Open Selected Log Workbook";
+        openSelectedLogWorkbookButton.UseVisualStyleBackColor = true;
         // 
         // openLogsFolderButton
         // 
-        openLogsFolderButton.Location = new Point(512, 8);
+        openLogsFolderButton.Location = new Point(552, 8);
         openLogsFolderButton.Margin = new Padding(3, 8, 8, 3);
         openLogsFolderButton.Name = "openLogsFolderButton";
         openLogsFolderButton.Size = new Size(125, 30);
@@ -423,7 +484,7 @@ partial class MainForm
         // 
         // openLogIndexButton
         // 
-        openLogIndexButton.Location = new Point(648, 8);
+        openLogIndexButton.Location = new Point(688, 8);
         openLogIndexButton.Margin = new Padding(3, 8, 8, 3);
         openLogIndexButton.Name = "openLogIndexButton";
         openLogIndexButton.Size = new Size(125, 30);
@@ -448,6 +509,8 @@ partial class MainForm
         logTypeLayoutPanel.ResumeLayout(false);
         logTypeLayoutPanel.PerformLayout();
         qaActionFlowLayoutPanel.ResumeLayout(false);
+        runningWorkbookLayoutPanel.ResumeLayout(false);
+        runningWorkbookLayoutPanel.PerformLayout();
         contentSplitContainer.Panel1.ResumeLayout(false);
         contentSplitContainer.Panel2.ResumeLayout(false);
         contentSplitContainer.Panel2.PerformLayout();

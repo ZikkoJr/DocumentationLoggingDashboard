@@ -1,207 +1,272 @@
+using System.Text;
+using ClosedXML.Excel;
+using DocumentationLoggingDashboard.DocumentationLogs;
 using DocumentationLoggingDashboard.Models;
-using DocumentationLoggingDashboard.Services;
 
 namespace DocumentationLoggingDashboard.GeometryTests;
 
+/// <summary>
+/// Protects the V1 transition boundary: historical daily TXT/index bytes remain
+/// authoritative and untouched while new DEBUG/EDIT/CREATE events use the Excel
+/// workflow and retain the established prefixes, folders, and index format.
+/// </summary>
 internal static class V1SyntheticRegressionTests
 {
+    private static readonly DateTimeOffset TestTimestamp =
+        new(2026, 7, 20, 10, 24, 0, TimeSpan.FromHours(-4));
+
     public static int RunAll(TextWriter output)
     {
         ArgumentNullException.ThrowIfNull(output);
 
-        string parentPath = Path.GetFullPath(Path.Combine(
-            Path.GetTempPath(),
-            "DocumentationLoggingDashboard.V1RegressionTests"));
-        string rootPath = Path.Combine(
-            parentPath,
-            "r-" + Guid.NewGuid().ToString("N")[..16]);
-        string settingsPath = Path.Combine(AppContext.BaseDirectory, "user-settings.json");
-        bool settingsCreated = false;
-
         try
         {
-            if (File.Exists(settingsPath))
+            using DocumentationLogSyntheticEnvironment environment = new();
+            byte[] detailedQaIndexBefore = File.ReadAllBytes(
+                environment.QaPaths.QaReportIndexFilePath);
+            Dictionary<LogType, byte[]> legacyBytes = SeedLegacyTxt(environment);
+            byte[] historicalIndex = SeedHistoricalIndex(environment);
+            Dictionary<LogType, DocumentationLogSaveResult> results = [];
+
+            foreach ((LogType type, string prefix, string stem) in Cases())
             {
-                throw new InvalidOperationException(
-                    $"V1 regression refused to replace existing runtime settings '{settingsPath}'.");
+                string running = environment.CreateRunning(type, stem);
+                DocumentationLogSaveResult result = environment
+                    .CreateSaveService(TestTimestamp)
+                    .Save(CreateRequest(environment, type, running));
+                results[type] = result;
+
+                Check(
+                    result.Event.LogId == $"{prefix}-20260720-005",
+                    $"{type} did not continue above its V1 TXT/index sequence.");
+                Check(
+                    result.RunningWorkbookPath.EndsWith(
+                        Path.Combine("Running", running),
+                        StringComparison.OrdinalIgnoreCase),
+                    $"{type} did not save to its legacy folder's Running child.");
+                Check(
+                    DocumentationLogSyntheticEnvironment.CountWorkbookRows(
+                        result.RunningWorkbookPath) == 1,
+                    $"{type} Running workbook did not receive exactly one row.");
+                CheckEveryCopyContainsOneIdenticalEvent(result);
             }
 
-            SettingsService settingsService = new();
-            settingsService.UpdateDocumentationRootFolder(rootPath);
-            settingsCreated = true;
+            AssertLegacyTxtPreserved(environment, legacyBytes);
+            AssertIndexCompatibility(environment, historicalIndex, results);
+            AssertQaIsolation(environment, detailedQaIndexBefore);
 
-            LogTemplateService templateService = new();
-            LogFileService fileService = new(settingsService, templateService);
-            LogIdService idService = new(templateService, fileService);
-            LogIndexService indexService = new(fileService, templateService);
-            fileService.EnsureDocumentationRootFolder();
-
-            DateTime timestamp = new(2026, 7, 20, 10, 24, 0, DateTimeKind.Local);
-            V1Case[] cases =
-            [
-                new(
-                    LogType.DebuggingLog,
-                    "DEBUG",
-                    "DebuggingLogs",
-                    "DebuggingLog",
-                    new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["hotelName"] = "Synthetic Harbour & Pine",
-                        ["hotelId"] = "SYN-V1-001",
-                        ["pms"] = "Synthetic PMS One",
-                        ["errorShownOnTicket"] = "Synthetic error summary",
-                        ["rootCause"] = "Synthetic root cause",
-                        ["fixApplied"] = "Synthetic fix summary"
-                    }),
-                new(
-                    LogType.ScriptEditingLog,
-                    "EDIT",
-                    "ScriptEditingLogs",
-                    "ScriptEditingLog",
-                    new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["scriptName"] = "Synthetic Edit Script",
-                        ["reasonForEdit"] = "Synthetic edit reason",
-                        ["changesMade"] = "Synthetic edit summary",
-                        ["hotelAppliedTo"] = "Synthetic Hotel Group"
-                    }),
-                new(
-                    LogType.ScriptCreationLog,
-                    "CREATE",
-                    "ScriptCreationLogs",
-                    "ScriptCreationLog",
-                    new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["scriptName"] = "Synthetic Created Script",
-                        ["reasonForCreation"] = "Synthetic creation reason",
-                        ["scriptPurpose"] = "Synthetic script purpose",
-                        ["hotelsThatUseThisScript"] = "Synthetic Hotel A; Synthetic Hotel B"
-                    })
-            ];
-
-            foreach (V1Case testCase in cases)
+            foreach ((LogType type, string prefix, _) in Cases())
             {
-                string expectedFirstId = $"{testCase.Prefix}-20260720-001";
-                string logId = idService.GenerateNextLogId(testCase.LogType, timestamp);
-                Check(logId == expectedFirstId, $"Unexpected first {testCase.LogType} ID '{logId}'.");
-
-                LogEntry entry = new()
-                {
-                    LogType = testCase.LogType,
-                    LogId = logId,
-                    DateTime = timestamp,
-                    CreatedBy = "Synthetic QA",
-                    NotesFollowUp = "Synthetic aggregate-only follow-up"
-                };
-                foreach ((string key, string value) in testCase.Fields)
-                {
-                    entry.FieldValues[key] = value;
-                }
-
-                string formatted = templateService.FormatEntry(entry);
-                string savedPath = fileService.SaveEntry(entry, formatted);
-                string indexPath = indexService.AppendEntry(entry, savedPath);
-                string expectedPath = Path.Combine(
-                    rootPath,
-                    testCase.FolderName,
-                    $"2026-07-20_{testCase.FileSuffix}.txt");
-
-                Check(PathsEqual(savedPath, expectedPath), $"Unexpected {testCase.LogType} path '{savedPath}'.");
-                Check(File.Exists(savedPath), $"Missing {testCase.LogType} output.");
+                string next = environment.CreateSaveService(TestTimestamp)
+                    .CreatePreview(CreateRequest(
+                        environment,
+                        type,
+                        results[type].RunningWorkbookFileName))
+                    .LogId;
                 Check(
-                    File.ReadAllText(savedPath) == formatted.TrimEnd() + Environment.NewLine,
-                    $"{testCase.LogType} text output changed from the V1 template.");
-                Check(
-                    idService.GenerateNextLogId(testCase.LogType, timestamp)
-                        == $"{testCase.Prefix}-20260720-002",
-                    $"{testCase.LogType} daily sequence did not advance to 002.");
-                Check(
-                    PathsEqual(fileService.EnsureLogFolder(testCase.LogType), Path.GetDirectoryName(expectedPath)!),
-                    $"{testCase.LogType} folder action resolved an unexpected directory.");
-                Check(File.Exists(indexPath), "The central V1 LogIndex was not created.");
+                    next == $"{prefix}-20260720-006",
+                    $"{type} durable sequence did not advance once per logical event.");
             }
-
-            string v1IndexPath = indexService.GetIndexFilePath();
-            string[] indexLines = File.ReadAllLines(v1IndexPath);
-            Check(indexLines.Length == cases.Length, $"V1 LogIndex contains {indexLines.Length} lines, expected 3.");
-            foreach (V1Case testCase in cases)
-            {
-                string expectedId = $"{testCase.Prefix}-20260720-001";
-                string line = indexLines.Single(candidate => candidate.Contains(expectedId, StringComparison.Ordinal));
-                Check(line.Split(" | ", StringSplitOptions.None).Length == 7, $"Index line for {expectedId} does not have seven fields.");
-            }
-
-            Check(!Directory.Exists(Path.Combine(rootPath, "QAReports")), "V1 regression created a QAReports tree.");
-            Check(
-                !Directory.EnumerateFiles(rootPath, "*QAReportIndex*", SearchOption.AllDirectories).Any(),
-                "V1 regression contaminated a QA report index.");
-            Check(
-                !Directory.Exists(Path.Combine(rootPath, "ByHotel"))
-                    && !Directory.Exists(Path.Combine(rootPath, "ByPMS")),
-                "Debugging Logs were routed into Hotel/PMS folders; that V2.1 feature must remain deferred.");
 
             output.WriteLine(
-                "[PASS] V1 synthetic regression: DEBUG/EDIT/CREATE prefixes, daily sequence, filenames, exact text, three-entry LogIndex, folder resolution, and V1/V2 isolation passed.");
+                "[PASS] V1 compatibility regression: DEBUG/EDIT/CREATE prefixes, legacy folders, byte-exact historical TXT/index prefixes, Excel Running/history routing, one index row per event, and QA isolation passed.");
             output.WriteLine(
-                "  Debugging Log remained only in DebuggingLogs; Hotel/PMS routing is correctly not implemented.");
+                "  Historical daily TXT remained read-only; all new synthetic entries used transactional Excel workbooks.");
             return 0;
         }
         catch (Exception exception)
         {
-            output.WriteLine("[FAIL] V1 synthetic regression");
-            output.WriteLine(exception.ToString());
+            output.WriteLine("[FAIL] V1 compatibility regression");
+            output.WriteLine(exception);
             return 1;
         }
-        finally
-        {
-            if (settingsCreated && File.Exists(settingsPath))
-            {
-                File.Delete(settingsPath);
-            }
-
-            DeleteVerifiedRoot(rootPath, parentPath);
-        }
     }
 
-    private static void DeleteVerifiedRoot(string rootPath, string parentPath)
+    private static Dictionary<LogType, byte[]> SeedLegacyTxt(
+        DocumentationLogSyntheticEnvironment environment)
     {
-        string fullRoot = Path.GetFullPath(rootPath);
-        string fullParent = Path.GetFullPath(parentPath);
-        string leaf = Path.GetFileName(fullRoot);
-        bool verifiedLeaf = leaf.Length == 18
-            && leaf.StartsWith("r-", StringComparison.Ordinal)
-            && leaf[2..].All(Uri.IsHexDigit);
-        bool strictlyInside = fullRoot.StartsWith(
-            fullParent.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
-            StringComparison.OrdinalIgnoreCase);
+        Dictionary<LogType, byte[]> bytes = [];
 
-        if (!verifiedLeaf || !strictlyInside)
+        foreach ((LogType type, string prefix, _) in Cases())
         {
-            throw new InvalidOperationException("V1 regression cleanup refused an unverified path.");
+            byte[] content = Encoding.UTF8.GetBytes(
+                $"Historical V1 record\r\nLog ID: {prefix}-20260720-003\r\n");
+            string path = environment.Paths.GetLegacyDailyLogFilePath(
+                type,
+                TestTimestamp.DateTime);
+            File.WriteAllBytes(path, content);
+            bytes[type] = content;
         }
 
-        if (Directory.Exists(fullRoot))
-        {
-            Directory.Delete(fullRoot, recursive: true);
-        }
+        return bytes;
+    }
 
-        try
+    private static byte[] SeedHistoricalIndex(
+        DocumentationLogSyntheticEnvironment environment)
+    {
+        string[] lines = Cases()
+            .Select(testCase =>
+            {
+                string legacyPath = environment.Paths.GetLegacyDailyLogFilePath(
+                    testCase.Type,
+                    TestTimestamp.DateTime);
+                return $"2026-07-20 | 9:00 AM | {testCase.Prefix}-20260720-004 | {DocumentationLogWorkbookSchema.GetDisplayName(testCase.Type)} | Historical item | Historical association | {legacyPath}";
+            })
+            .ToArray();
+        byte[] content = Encoding.UTF8.GetBytes(
+            string.Join("\r\n", lines) + "\r\n");
+        File.WriteAllBytes(environment.Paths.LogIndexFilePath, content);
+        return content;
+    }
+
+    private static DocumentationLogSaveRequest CreateRequest(
+        DocumentationLogSyntheticEnvironment environment,
+        LogType type,
+        string runningWorkbookFileName)
+    {
+        return type switch
         {
-            Directory.Delete(fullParent, recursive: false);
-        }
-        catch (IOException)
+            LogType.DebuggingLog => environment.CreateDebuggingRequest(
+                runningWorkbookFileName,
+                createdBy: string.Empty,
+                notes: string.Empty),
+            LogType.ScriptEditingLog or LogType.ScriptCreationLog =>
+                environment.CreateScriptRequest(
+                    type,
+                    runningWorkbookFileName,
+                    "1953; 2093; 3001",
+                    createdBy: string.Empty,
+                    notes: string.Empty),
+            _ => throw new ArgumentOutOfRangeException(nameof(type))
+        };
+    }
+
+    private static void CheckEveryCopyContainsOneIdenticalEvent(
+        DocumentationLogSaveResult result)
+    {
+        string[] paths = result.HotelHistoryPaths
+            .Concat(result.PmsHistoryPaths)
+            .Prepend(result.RunningWorkbookPath)
+            .ToArray();
+        string[] signatures = paths.Select(ReadOnlyRowSignature).ToArray();
+
+        Check(
+            signatures.All(signature => signature == signatures[0]),
+            $"{result.Event.LogType} copies did not contain one identical event row.");
+        Check(
+            paths.All(path =>
+                DocumentationLogSyntheticEnvironment.CountWorkbookRows(path) == 1),
+            $"{result.Event.LogType} routed a duplicate or missing workbook row.");
+
+        int expectedHotelCopies = result.Event.LogType == LogType.DebuggingLog
+            ? 1
+            : 3;
+        int expectedPmsCopies = result.Event.LogType == LogType.DebuggingLog
+            ? 1
+            : 2;
+        Check(
+            result.HotelHistoryPaths.Count == expectedHotelCopies
+                && result.PmsHistoryPaths.Count == expectedPmsCopies,
+            $"{result.Event.LogType} Hotel/PMS fan-out or PMS deduplication changed.");
+    }
+
+    private static string ReadOnlyRowSignature(string path)
+    {
+        using XLWorkbook workbook = new(path);
+        IXLWorksheet worksheet = workbook.Worksheet(
+            DocumentationLogWorkbookSchema.DataWorksheetName);
+        int columns = worksheet.Tables.Single().ColumnCount();
+        string timestamp = worksheet.Cell(4, 1).GetDateTime().ToString("O");
+        return string.Join(
+            "\u001f",
+            new[] { timestamp }.Concat(
+                Enumerable.Range(2, columns - 1)
+                    .Select(column => worksheet.Cell(4, column).GetString())));
+    }
+
+    private static void AssertLegacyTxtPreserved(
+        DocumentationLogSyntheticEnvironment environment,
+        IReadOnlyDictionary<LogType, byte[]> legacyBytes)
+    {
+        foreach ((LogType type, byte[] expected) in legacyBytes)
         {
-        }
-        catch (UnauthorizedAccessException)
-        {
+            string path = environment.Paths.GetLegacyDailyLogFilePath(
+                type,
+                TestTimestamp.DateTime);
+            Check(
+                File.ReadAllBytes(path).SequenceEqual(expected),
+                $"Historical {type} TXT bytes changed.");
+            Check(
+                Directory.EnumerateFiles(
+                    environment.Paths.GetLegacyLogDirectory(type),
+                    "*.txt",
+                    SearchOption.TopDirectoryOnly).Count() == 1,
+                $"A new daily {type} TXT file was created.");
         }
     }
 
-    private static bool PathsEqual(string left, string right) =>
-        string.Equals(
-            Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar),
-            Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar),
-            StringComparison.OrdinalIgnoreCase);
+    private static void AssertIndexCompatibility(
+        DocumentationLogSyntheticEnvironment environment,
+        byte[] historicalIndex,
+        IReadOnlyDictionary<LogType, DocumentationLogSaveResult> results)
+    {
+        byte[] finalBytes = File.ReadAllBytes(environment.Paths.LogIndexFilePath);
+        Check(
+            finalBytes.AsSpan(0, historicalIndex.Length).SequenceEqual(
+                historicalIndex),
+            "Historical LogIndex bytes were rewritten.");
+
+        string[] lines = File.ReadAllLines(environment.Paths.LogIndexFilePath);
+        Check(lines.Length == 6, $"LogIndex contains {lines.Length} lines, expected 6.");
+
+        foreach (DocumentationLogSaveResult result in results.Values)
+        {
+            string line = lines.Single(candidate => candidate.Contains(
+                result.Event.LogId,
+                StringComparison.Ordinal));
+            Check(
+                line.Split(" | ", StringSplitOptions.None).Length == 7,
+                $"Index line for {result.Event.LogId} does not have seven fields.");
+            Check(
+                line.Contains(result.RunningWorkbookPath, StringComparison.Ordinal)
+                    && line.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase),
+                $"Index line for {result.Event.LogId} does not point to its Running workbook.");
+        }
+    }
+
+    private static void AssertQaIsolation(
+        DocumentationLogSyntheticEnvironment environment,
+        byte[] detailedQaIndexBefore)
+    {
+        Check(
+            File.ReadAllBytes(environment.QaPaths.QaReportIndexFilePath)
+                .SequenceEqual(detailedQaIndexBefore),
+            "Documentation saves contaminated the Detailed QA index.");
+        Check(
+            !File.Exists(environment.QaPaths.QuickQaSettingsFilePath),
+            "Documentation saves contaminated Quick QA preferences.");
+        Check(
+            !Directory.EnumerateFiles(
+                    environment.QaPaths.QaReportsRootPath,
+                    "*.pdf",
+                    SearchOption.AllDirectories)
+                .Any(),
+            "Documentation saves created a Detailed QA PDF.");
+        Check(
+            !Directory.EnumerateFiles(
+                    environment.QaPaths.QaReportsRootPath,
+                    "QuickQAHistory.xlsx",
+                    SearchOption.AllDirectories)
+                .Any(),
+            "Documentation saves created a Quick QA history workbook.");
+    }
+
+    private static IEnumerable<(LogType Type, string Prefix, string Stem)> Cases()
+    {
+        yield return (LogType.DebuggingLog, "DEBUG", "V1 Debug Running");
+        yield return (LogType.ScriptEditingLog, "EDIT", "V1 Edit Running");
+        yield return (LogType.ScriptCreationLog, "CREATE", "V1 Create Running");
+    }
 
     private static void Check(bool condition, string message)
     {
@@ -210,11 +275,4 @@ internal static class V1SyntheticRegressionTests
             throw new InvalidOperationException(message);
         }
     }
-
-    private sealed record V1Case(
-        LogType LogType,
-        string Prefix,
-        string FolderName,
-        string FileSuffix,
-        IReadOnlyDictionary<string, string> Fields);
 }

@@ -1,7 +1,10 @@
-Documentation Logging Dashboard V1 Test Checklist
-=================================================
+Documentation Logging Dashboard - Excel Logs and V1 Compatibility Checklist
+============================================================================
 
-Use this checklist for manual UI testing after the build passes.
+Use this checklist for manual UI testing after the build and automated
+regression harness pass. The filename is retained for continuity with the V1
+release checklist. Current submissions use Excel; historical V1 TXT files
+remain valid read-only records.
 
 Startup
 -------
@@ -9,137 +12,226 @@ Startup
 [ ] Start the app.
 [ ] Confirm the dashboard opens without errors.
 [ ] Confirm the current documentation root folder path is visible.
+[ ] Confirm the existing selector contains Debugging Log, Script Editing Log,
+    and Script Creation Log.
 [ ] Confirm the privacy reminder is visible:
-    Reminder: Do not enter guest names, emails, payment data, credentials, or full hotel files into logs. Use ticket IDs, hotel IDs, script names, and summarized issues instead.
+    Reminder: Do not enter guest names, emails, payment data, credentials, or
+    full hotel files into logs. Use ticket IDs, hotel IDs, script names, and
+    summarized issues instead.
+
+Running workbook selection
+--------------------------
+
+[ ] Select Debugging Log and confirm the active Running-workbook selector lists
+    only compatible Debugging Running `.xlsx` files.
+[ ] Select Script Editing Log and confirm the selector changes to compatible
+    Editing Running files.
+[ ] Select Script Creation Log and confirm the selector changes to compatible
+    Creation Running files.
+[ ] Use Create New Log File for each type and confirm `.xlsx` is appended when
+    omitted and the created workbook is immediately selected.
+[ ] Confirm an existing filename is not overwritten.
+[ ] Confirm rooted paths, path separators/traversal, unsupported extensions,
+    invalid names, and reserved Windows names are rejected.
+[ ] Close and reopen the app and confirm each type remembers its own last-used
+    Running workbook.
+[ ] Rename or remove a remembered workbook in a synthetic test root and confirm
+    the app remains usable and permits another selection/creation.
 
 Preview each log type
 ---------------------
 
 [ ] Select Debugging Log.
-[ ] Fill all required Debugging Log fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
+[ ] Search for and select a Hotel by Hotel ID.
+[ ] Confirm canonical Hotel Name, Hotel ID, and PMS are shown read-only.
+[ ] Fill Error Shown On Ticket, Root Cause, and Fix Applied.
+[ ] Leave Created By and Notes / Follow-up blank.
 [ ] Click Preview Entry.
-[ ] Confirm the preview includes a DEBUG-yyyyMMdd-### Log ID.
+[ ] Confirm the preview includes a candidate DEBUG-yyyyMMdd-### Log ID.
 [ ] Confirm blank optional fields show N/A.
 
 [ ] Select Script Editing Log.
-[ ] Fill all required Script Editing Log fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
+[ ] Enter one or more manual Hotel IDs using comma, semicolon, or multiple lines.
+[ ] Fill Script Name, Reason For Edit, and Changes Made.
+[ ] Leave Created By and Notes / Follow-up blank.
 [ ] Click Preview Entry.
-[ ] Confirm the preview includes an EDIT-yyyyMMdd-### Log ID.
+[ ] Confirm the preview includes a candidate EDIT-yyyyMMdd-### Log ID.
+[ ] Confirm the normalized Hotel IDs retain leading zeroes and first-entered
+    order and use `ID1; ID2; ID3` representation.
 [ ] Confirm blank optional fields show N/A.
 
 [ ] Select Script Creation Log.
-[ ] Fill all required Script Creation Log fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
+[ ] Enter one or more manual Hotel IDs.
+[ ] Fill Script Name, Reason For Creation, and Script Purpose / What It Does.
+[ ] Leave Created By and Notes / Follow-up blank.
 [ ] Click Preview Entry.
-[ ] Confirm the preview includes a CREATE-yyyyMMdd-### Log ID.
+[ ] Confirm the preview includes a candidate CREATE-yyyyMMdd-### Log ID.
 [ ] Confirm blank optional fields show N/A.
 
-Required-field validation
--------------------------
+Required-field and metadata validation
+--------------------------------------
 
-[ ] Select Debugging Log.
-[ ] Clear at least one required Debugging Log field.
-[ ] Click Preview Entry and confirm the missing field is reported.
-[ ] Click Submit Entry and confirm the missing field is reported.
+[ ] For Debugging, clear each of Hotel selection, Error Shown On Ticket, Root
+    Cause, and Fix Applied in turn and confirm Preview/Submit reports it.
+[ ] For Editing, clear each of Hotel ID(s), Script Name, Reason For Edit, and
+    Changes Made in turn and confirm Preview/Submit reports it.
+[ ] For Creation, clear each of Hotel ID(s), Script Name, Reason For Creation,
+    and Script Purpose / What It Does in turn and confirm Preview/Submit reports
+    it.
+[ ] Enter one unknown Hotel ID and confirm the full Editing/Creation save is
+    blocked and identifies the ID.
+[ ] Enter mixed valid and invalid IDs and confirm no partial event is written.
+[ ] Enter duplicate IDs and confirm they normalize once in first-entered order.
+[ ] Change/remove a selected Debugging Hotel's metadata before Submit and confirm
+    fresh resolution blocks the stale selection and requires refresh/reselection.
 
-[ ] Select Script Editing Log.
-[ ] Clear at least one required Script Editing Log field.
-[ ] Click Preview Entry and confirm the missing field is reported.
-[ ] Click Submit Entry and confirm the missing field is reported.
+Submit and route entries
+------------------------
 
-[ ] Select Script Creation Log.
-[ ] Clear at least one required Script Creation Log field.
-[ ] Click Preview Entry and confirm the missing field is reported.
-[ ] Click Submit Entry and confirm the missing field is reported.
+[ ] Submit one valid Debugging event.
+[ ] Confirm exactly one row is added to the selected Debugging Running workbook.
+[ ] Confirm exactly one row is added to the selected Hotel's
+    DebuggingLogHistory.xlsx.
+[ ] Confirm exactly one row is added to the selected canonical PMS's
+    DebuggingLogHistory.xlsx.
+[ ] Confirm all copies have identical Log ID, Date/Time, canonical metadata,
+    business values, Created By, and Notes / Follow-up.
 
-Submit entries
---------------
+[ ] Submit one Editing event for two Hotels on the same PMS.
+[ ] Confirm Running is updated once, each Hotel history once, and the shared PMS
+    history once.
+[ ] Submit one Editing event for Hotels on different PMS systems and confirm each
+    unique PMS history is updated once.
+[ ] Confirm Script Name, Reason For Edit, Changes Made, and the full normalized
+    Hotel-ID list are identical in every copy.
 
-[ ] Select Debugging Log.
-[ ] Fill all required fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
-[ ] Click Submit Entry.
-[ ] Confirm the success message appears.
-[ ] Confirm the form clears.
+[ ] Repeat the same same-PMS and different-PMS routing checks for Script Creation.
+[ ] Confirm Script Name, Reason For Creation, Script Purpose / What It Does, and
+    the full normalized Hotel-ID list are identical in every copy.
+[ ] Confirm a successful Submit clears draft fields but retains the selected
+    type's Running-workbook preference.
 
-[ ] Select Script Editing Log.
-[ ] Fill all required fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
-[ ] Click Submit Entry.
-[ ] Confirm the success message appears.
-[ ] Confirm the form clears.
+Workbook files and schemas
+--------------------------
 
-[ ] Select Script Creation Log.
-[ ] Fill all required fields.
-[ ] Leave Created By blank.
-[ ] Leave Notes / Follow-up blank.
-[ ] Click Submit Entry.
-[ ] Confirm the success message appears.
-[ ] Confirm the form clears.
+[ ] Confirm the selected root contains DebuggingLogs/Running,
+    ScriptEditingLogs/Running, ScriptCreationLogs/Running, and Index.
+[ ] Confirm Running workbooks remain direct children of their assigned Running
+    folder.
+[ ] Confirm Hotel histories live only under QAReports/ByHotel/<canonical folder>.
+[ ] Confirm PMS histories live only under QAReports/ByPMS/<canonical folder>.
+[ ] Confirm row 1 is the human-readable scope title, row 2 is blank, row 3 is the
+    exact header row, and row 4 onward contains data.
+[ ] Confirm each workbook uses a real filtered Excel Table and freezes through
+    the header row.
+[ ] Confirm Date/Time is a real Excel date/time and Log ID/Hotel IDs are text.
+[ ] Confirm long text wraps and no cells inside the data table are merged.
+[ ] Confirm `Log Type` is not a table column.
+[ ] Confirm hidden `__DLD_Metadata` identifies schema version 1, log type, scope,
+    and scope ID.
+[ ] Confirm an existing wrong-type, wrong-scope, changed-header, missing-metadata,
+    unsupported-version, or corrupt workbook is rejected without alteration.
 
-Files and folders
------------------
+Historical V1 TXT compatibility
+-------------------------------
 
-[ ] Confirm the selected documentation root folder contains DebuggingLogs.
-[ ] Confirm the selected documentation root folder contains ScriptEditingLogs.
-[ ] Confirm the selected documentation root folder contains ScriptCreationLogs.
-[ ] Confirm the selected documentation root folder contains Index.
-[ ] Confirm today's Debugging Log file exists as yyyy-MM-dd_DebuggingLog.txt.
-[ ] Confirm today's Script Editing Log file exists as yyyy-MM-dd_ScriptEditingLog.txt.
-[ ] Confirm today's Script Creation Log file exists as yyyy-MM-dd_ScriptCreationLog.txt.
-[ ] Open each daily .txt file and confirm the saved entry format is readable.
-[ ] Confirm blank Created By values saved as N/A.
-[ ] Confirm blank Notes / Follow-up values saved as N/A.
+[ ] In an isolated root, place representative historical daily files directly
+    under DebuggingLogs, ScriptEditingLogs, and ScriptCreationLogs.
+[ ] Record their hashes/bytes before submitting a new Excel event.
+[ ] Submit new Debugging, Editing, and Creation Excel events.
+[ ] Confirm every historical TXT file remains byte-for-byte unchanged.
+[ ] Confirm no new daily TXT file is created and no existing TXT file receives a
+    new entry.
+[ ] Confirm historical TXT files were not moved, renamed, deleted, or migrated.
+[ ] Confirm Open Logs Folder still permits operators to reach historical TXT.
 
-LogIndex.txt
-------------
+LogIndex.txt and sequence state
+------------------------------
 
 [ ] Confirm Index/LogIndex.txt exists.
-[ ] Confirm each submitted entry added one pipe-separated index line.
-[ ] Confirm the Debugging Log line uses Hotel: {Hotel Name} / {Hotel ID}.
-[ ] Confirm the Debugging Log line uses PMS: {PMS}.
-[ ] Confirm the Script Editing Log line uses Script: {Script Name}.
-[ ] Confirm the Script Editing Log line uses Hotel Applied To: {Hotel Applied To}.
-[ ] Confirm the Script Creation Log line uses Script: {Script Name}.
-[ ] Confirm the Script Creation Log line uses Hotels That Use This Script: {Hotels that use this script}.
-[ ] Confirm each index line includes the saved daily log file path.
-[ ] Confirm no V1 entry is added to QAReports/Index/QAReportIndex.txt.
-[ ] Confirm a Debugging Log remains only under DebuggingLogs and is not routed
-    into Hotel/PMS folders. This is expected until the deferred V2.1 enhancement.
+[ ] Confirm each logical event adds exactly one pipe-separated index line,
+    regardless of its Hotel/PMS workbook-copy count.
+[ ] Confirm the Debugging line uses Hotel: {Hotel Name} / {Hotel ID} and
+    PMS: {PMS}.
+[ ] Confirm Editing and Creation lines use Script: {Script Name} and
+    Hotel IDs: {canonical list}.
+[ ] Confirm each new Saved File field points to the selected Running `.xlsx`, not
+    a Hotel/PMS history workbook.
+[ ] Confirm historical index lines and their daily TXT paths remain unchanged.
+[ ] Confirm no documentation entry is added to QAReports/Index/QAReportIndex.txt.
+[ ] Confirm `documentation-log-sequences.json` is versioned and root-scoped under
+    Index.
+[ ] Confirm first and second events of a day use 001 and 002 for each type.
+[ ] Confirm switching Running workbooks, creating a new Running workbook, and
+    restarting the app do not reset the sequence.
+[ ] Seed the current day's legacy TXT and LogIndex with different valid sequence
+    values and confirm the next ID is above the highest applicable value.
+[ ] Confirm Hotel/PMS copies do not consume additional IDs.
+[ ] Confirm Preview does not reserve or increment sequence state.
 
-Open buttons
-------------
+Locking, transaction, and reentrancy
+-----------------------------------
 
-[ ] Select a log type with a saved entry for today.
-[ ] Click Open Today's Log File and confirm today's selected log file opens.
-[ ] Select a log type with no saved entry for today, if available.
-[ ] Click Open Today's Log File and confirm a friendly not-found message appears.
-[ ] Click Open Logs Folder and confirm the current documentation root folder opens.
-[ ] Click Open Log Index and confirm LogIndex.txt opens.
+[ ] Open the selected Running workbook in Excel and confirm Submit reports a
+    friendly unavailable message and commits nothing.
+[ ] Repeat with one required Hotel history workbook open.
+[ ] Repeat with one required PMS history workbook open.
+[ ] Simulate an index or sequence-state failure and confirm no success message
+    and no ordinary partial event remains.
+[ ] Simulate a source change between staging and commit and confirm it is detected
+    rather than silently overwritten.
+[ ] Confirm ordinary commit failure restores already replaced files and removes
+    newly committed files.
+[ ] Where rollback itself is forced to fail, confirm the app identifies every
+    manual-review path and does not claim restoration or success.
+[ ] Confirm normal success/failure cleanup leaves no staging or backup residue.
+[ ] Double-click Submit and confirm the save/reentrancy guard creates one event.
+
+Switching types and open actions
+-------------------------------
+
+[ ] Enter a Debugging draft, switch to Editing, and confirm Debugging Hotel and
+    business state does not leak into Editing.
+[ ] Enter Editing Hotel IDs/business values, switch to Creation, and confirm they
+    do not leak into Creation.
+[ ] Switch repeatedly and confirm controls and click handlers do not duplicate.
+[ ] Click Open Selected Log Workbook and confirm the selected Running workbook
+    opens.
+[ ] Remove/unavailable the selected workbook and confirm a friendly message is
+    shown rather than a crash.
+[ ] Click Open Logs Folder and confirm the current documentation root opens.
+[ ] Click Open Log Index and confirm LogIndex.txt opens or a friendly missing
+    message appears.
 
 Folder settings
 ---------------
 
-[ ] Click Change Logs Folder.
-[ ] Select a new test folder.
-[ ] Confirm the displayed documentation root folder changes.
-[ ] Submit a new entry.
-[ ] Confirm the new entry is saved under the newly selected folder.
-[ ] Confirm changing the logs folder does not move old logs.
-[ ] Click Reset to Default Folder.
-[ ] Confirm the displayed documentation root folder returns to the default DocumentationLogs location.
-[ ] Submit a new entry.
-[ ] Confirm the new entry is saved under the default folder.
+[ ] Click Change Logs Folder and select a new isolated test root.
+[ ] Confirm the displayed root, metadata, Running choices, and root-scoped
+    preferences refresh.
+[ ] Submit a new event and confirm it is written only beneath the new root.
+[ ] Confirm changing the root does not move old TXT or Excel files.
+[ ] Click Reset to Default Folder and confirm the displayed root and choices
+    refresh to the default DocumentationLogs location.
+
+Quick QA and Detailed QA isolation
+----------------------------------
+
+[ ] Run the approved Quick QA regressions and confirm Surface workbook schema,
+    remembered Surface workbook, Hotel history, findings/status, formatting, and
+    transaction behavior are unchanged.
+[ ] Run the approved Detailed QA regressions and confirm PDF output, paired
+    Hotel/PMS save, Detailed index, File ID, warnings, strategy logic, findings,
+    and statistics are unchanged.
+[ ] Confirm documentation workbook preferences do not modify
+    quick-qa-settings.json.
+[ ] Confirm documentation Log IDs/index remain separate from Detailed QA File ID
+    and QAReportIndex.txt.
 
 Privacy
 -------
 
-[ ] Confirm testers know not to enter guest names, emails, payment data, credentials, or full hotel files.
-[ ] Use only ticket IDs, hotel IDs, script names, and summarized issues in test entries.
+[ ] Confirm testers know not to enter guest names, guest emails, payment data,
+    credentials, confirmation-level PII, copied raw rows, or full hotel files.
+[ ] Use only ticket IDs, Hotel IDs, script names, and summarized operational
+    issues in test entries.

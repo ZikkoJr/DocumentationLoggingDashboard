@@ -1,19 +1,22 @@
 Documentation Logging Dashboard
 ===============================
 
-Documentation Logging Dashboard is a C# WinForms desktop application for the
-three established V1 plain-text documentation logs and two explicit QA
-workflows. V1 entries retain their daily .txt files and LogIndex.txt. Detailed
-QA creates paired Hotel/PMS PDF reports and a separate QA Report index. Quick QA
-appends a client-facing Surface workbook and the selected Hotel's private Quick
-QA history as one logical save.
+Documentation Logging Dashboard is a C# WinForms desktop application for three
+established documentation logs and two explicit QA workflows. New Debugging,
+Script Editing, and Script Creation entries use selected Running Excel
+workbooks plus canonical Hotel/PMS Excel histories. Historical V1 daily .txt
+files and their LogIndex.txt entries remain valid and are not migrated or
+modified. Detailed QA creates paired Hotel/PMS PDF reports and a separate QA
+Report index. Quick QA appends a client-facing Surface workbook and the selected
+Hotel's private Quick QA history as one logical save.
 
 QA actions
 ----------
 
 The dashboard exposes two direct actions. Detailed QA Report opens the existing
 full report workflow. Quick QA opens a dedicated one-page Surface QA workflow.
-There is no report-type wizard, and the three V1 logging actions are unchanged.
+There is no report-type wizard. The existing three-item documentation log-type
+selector remains the entry point for the Excel documentation workflows.
 
 Detailed QA Report
 ------------------
@@ -56,8 +59,8 @@ Failed Checks. Pending notes and other free text commit at validation/action
 boundaries, including before readiness and save. The Hotel and PMS copies are
 written from the same PDF bytes, and the QA index records the final status.
 
-The planned V2.1 enhancement "Route Debugging Logs into the applicable Hotel
-and PMS folders" is deferred. V2 does not change V1 Debugging Log routing.
+The formerly deferred Hotel/PMS documentation-log routing applies to new Excel
+events only. It does not rewrite or backfill historical V1 Debugging TXT files.
 
 Quick QA / Surface QA
 ---------------------
@@ -101,11 +104,14 @@ Current design and verification contracts are in:
 - docs/updates/Quick-QA-Surface-QA-Design.md
 - docs/updates/Detailed-QA-Check-Changes.md
 - docs/updates/Quick-QA-Test-Matrix.md
+- docs/updates/Excel-Documentation-Logs-Design.md
+- docs/updates/Excel-Documentation-Logs-Test-Matrix.md
+- docs/updates/Legacy-TXT-Compatibility.md
 
 Supported log types
 -------------------
 
-The preserved V1 workflow supports exactly three log types:
+The documentation workflow supports exactly three log types:
 
 - Debugging Log
 - Script Editing Log
@@ -116,26 +122,32 @@ Required fields
 
 Debugging Log:
 
-- Hotel Name
-- Hotel ID
-- PMS
+- One canonical Hotel selected through the searchable QA Hotel metadata picker
 - Error shown on ticket
 - Root cause
 - Fix applied
 
+The selected metadata supplies read-only Hotel Name, Hotel ID, and PMS values.
+Saving reloads metadata and blocks a removed or stale routing selection.
+
 Script Editing Log:
 
+- Hotel ID(s), entered manually and resolved through current metadata
 - Script Name
 - Reason for edit
 - Changes made
-- Hotel Applied To
 
 Script Creation Log:
 
+- Hotel ID(s), entered manually and resolved through current metadata
 - Script Name
 - Reason for creation
 - Script purpose / what it does
-- Hotels that use this script
+
+Editing and Creation accept comma-, semicolon-, or line-separated Hotel IDs.
+Unknown IDs block the full save. IDs remain text, leading zeroes are preserved,
+duplicates are removed in first-entered order, and workbook values use
+`ID1; ID2; ID3`.
 
 Optional fields
 ---------------
@@ -154,7 +166,9 @@ The app automatically includes:
 
 - Log ID
 - Date/Time
-- Log Type
+
+Log Type is stored in the hidden workbook schema metadata and shown through the
+selected workflow. It is deliberately not an Excel table column.
 
 Log ID format
 -------------
@@ -171,18 +185,26 @@ Examples:
 - EDIT-20260618-001
 - CREATE-20260618-001
 
-V1 output files
----------------
+Documentation log output and legacy V1 files
+--------------------------------------------
 
-The V1 workflow writes plain .txt files only. Daily log files use:
+Each log type has one actively selected Running `.xlsx` workbook. New files are
+created only beneath the applicable Running directory, and the app remembers a
+separate filename for Debugging, Script Editing, and Script Creation:
 
-yyyy-MM-dd_FileNameSuffix.txt
+- DebuggingLogs/Running/<selected workbook>.xlsx
+- ScriptEditingLogs/Running/<selected workbook>.xlsx
+- ScriptCreationLogs/Running/<selected workbook>.xlsx
 
-Examples:
+Each new event also updates every applicable canonical Hotel history and every
+applicable unique canonical PMS history under QAReports/ByHotel and
+QAReports/ByPMS. Debugging routes to one Hotel and one PMS. Editing and Creation
+accept one or more Hotel IDs, write each Hotel once, and write each canonical
+PMS once per event.
 
-- 2026-06-18_DebuggingLog.txt
-- 2026-06-18_ScriptEditingLog.txt
-- 2026-06-18_ScriptCreationLog.txt
+Historical V1 daily files such as `2026-06-18_DebuggingLog.txt` remain directly
+under the three legacy folders. They stay byte-for-byte untouched, receive no
+new entries, and are not moved into Running or migrated to Excel.
 
 Output folder structure
 -----------------------
@@ -192,18 +214,29 @@ The selected documentation root folder contains this structure:
 DocumentationLogs/
 |
 +-- DebuggingLogs/
+|   +-- Running/
 +-- ScriptEditingLogs/
+|   +-- Running/
 +-- ScriptCreationLogs/
+|   +-- Running/
 +-- Index/
-    +-- LogIndex.txt
+|   +-- LogIndex.txt
+|   +-- documentation-log-settings.json
+|   +-- documentation-log-sequences.json
++-- QAReports/
+    +-- ByHotel/<canonical Hotel folder>/<type-specific LogHistory.xlsx>
+    +-- ByPMS/<canonical PMS folder>/<type-specific LogHistory.xlsx>
 
-Missing folders are created automatically when logs are saved or when the logs
-folder is opened.
+Missing Running and deterministic history workbooks are created safely as part
+of the applicable logical save. An existing corrupt, locked, wrong-type,
+wrong-scope, or structurally incompatible workbook is rejected rather than
+repaired or overwritten.
 
 LogIndex.txt
 ------------
 
-Each successful save appends one pipe-separated summary line to:
+Each successful logical event appends exactly one pipe-separated summary line
+to the existing documentation index, regardless of Hotel/PMS copy count:
 
 DocumentationLogs/Index/LogIndex.txt
 
@@ -214,14 +247,21 @@ Date | Time | Log ID | Log Type | Primary Item | Secondary Item | Saved File
 Summary field mapping:
 
 - Debugging Log: Hotel: {Hotel Name} / {Hotel ID} | PMS: {PMS}
-- Script Editing Log: Script: {Script Name} | Hotel Applied To: {Hotel Applied To}
-- Script Creation Log: Script: {Script Name} | Hotels That Use This Script: {Hotels that use this script}
+- Script Editing Log: Script: {Script Name} | Hotel IDs: {canonical Hotel IDs}
+- Script Creation Log: Script: {Script Name} | Hotel IDs: {canonical Hotel IDs}
 
 Examples:
 
-- 2026-06-18 | 10:24 AM | DEBUG-20260618-001 | Debugging Log | Hotel: Example Hotel / 12345 | PMS: Mews | C:\CompanyDocs\DocumentationLogs\DebuggingLogs\2026-06-18_DebuggingLog.txt
-- 2026-06-18 | 10:31 AM | EDIT-20260618-001 | Script Editing Log | Script: MewsPMS.cs | Hotel Applied To: Example Hotel / 12345 | C:\CompanyDocs\DocumentationLogs\ScriptEditingLogs\2026-06-18_ScriptEditingLog.txt
-- 2026-06-18 | 10:42 AM | CREATE-20260618-001 | Script Creation Log | Script: CustomHotelRevenueParser.cs | Hotels That Use This Script: Example Hotel / 12345 | C:\CompanyDocs\DocumentationLogs\ScriptCreationLogs\2026-06-18_ScriptCreationLog.txt
+- 2026-06-18 | 10:24 AM | DEBUG-20260618-001 | Debugging Log | Hotel: Example Hotel / 12345 | PMS: Mews | C:\CompanyDocs\DocumentationLogs\DebuggingLogs\Running\Team Debugging.xlsx
+- 2026-06-18 | 10:31 AM | EDIT-20260618-001 | Script Editing Log | Script: MewsPMS.cs | Hotel IDs: 12345; 2093 | C:\CompanyDocs\DocumentationLogs\ScriptEditingLogs\Running\Script Editing.xlsx
+- 2026-06-18 | 10:42 AM | CREATE-20260618-001 | Script Creation Log | Script: CustomHotelRevenueParser.cs | Hotel IDs: 12345 | C:\CompanyDocs\DocumentationLogs\ScriptCreationLogs\Running\Script Creation.xlsx
+
+Historical index lines that point to daily TXT files remain unchanged. New
+lines point only to the selected Running workbook. Running/history workbooks,
+the one new index line, and sequence state are staged and committed as one
+rollback-capable logical save. An abrupt process or operating-system crash can
+still interrupt a multi-file commit before managed rollback runs; the app must
+report manual-review paths rather than claim success in that boundary.
 
 Changing the logs folder
 ------------------------

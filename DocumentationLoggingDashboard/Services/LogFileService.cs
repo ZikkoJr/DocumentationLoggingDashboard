@@ -50,7 +50,9 @@ public sealed class LogFileService
 
         foreach (LogType logType in logTemplateService.GetSupportedLogTypes())
         {
-            Directory.CreateDirectory(GetLogFolderPath(rootFolder, logType));
+            string legacyLogFolder = GetLogFolderPath(rootFolder, logType);
+            Directory.CreateDirectory(legacyLogFolder);
+            Directory.CreateDirectory(Path.Combine(legacyLogFolder, "Running"));
         }
 
         Directory.CreateDirectory(GetIndexFolderPath(rootFolder));
@@ -80,6 +82,10 @@ public sealed class LogFileService
         return Path.Combine(GetLogFolderPath(logType), logTemplateService.GetDailyFileName(logType, date));
     }
 
+    /// <summary>
+    /// Legacy TXT writer retained for compatibility tests and historical tooling.
+    /// New UI submissions are exclusively handled by DocumentationLogSaveService.
+    /// </summary>
     public string SaveEntry(LogEntry entry, string formattedEntry)
     {
         EnsureDocumentationFolderStructure();
