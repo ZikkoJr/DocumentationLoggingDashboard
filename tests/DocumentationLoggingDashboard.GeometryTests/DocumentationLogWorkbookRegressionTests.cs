@@ -13,6 +13,7 @@ internal static class DocumentationLogWorkbookRegressionTests
         (string Name, Action Body)[] tests =
         [
             ("exact schemas, metadata, presentation, and typed appended row", TestExactSchemasAndAppend),
+            ("Excel built-in Text format survives validation and append", TestBuiltInTextFormat),
             ("type, scope, marker, version, header, and corrupt rejection", TestCompatibilityRejections),
             ("strict filename safety, create-new semantics, and discovery", TestFilenameAndDiscovery),
             ("three independent atomic Running workbook preferences", TestPreferences)
@@ -130,6 +131,68 @@ internal static class DocumentationLogWorkbookRegressionTests
                 "N/A",
                 worksheet.Cell(4, optionalStartColumn + 1).GetString(),
                 $"{logType} blank Notes did not preserve N/A.");
+        }
+    }
+
+    private static void TestBuiltInTextFormat()
+    {
+        using DocumentationLogSyntheticEnvironment environment = new();
+        foreach (LogType type in DocumentationLogWorkbookSchema.SupportedLogTypes)
+        {
+            string fileName = environment.CreateRunning(type, $"Excel Text {type}");
+            DocumentationLogSaveRequest request = type == LogType.DebuggingLog
+                ? environment.CreateDebuggingRequest(fileName, environment.HotelLeadingZero)
+                : environment.CreateScriptRequest(type, fileName, "0012; 1953");
+            DocumentationLogSaveResult first = environment.CreateSaveService().Save(request);
+            int hotelColumn = type == LogType.DebuggingLog ? 4 : 3;
+            int[] idColumns = [2, hotelColumn];
+            string[] paths = [first.RunningWorkbookPath, .. first.HotelHistoryPaths, .. first.PmsHistoryPaths];
+
+            foreach (string path in paths)
+            {
+                byte[] excelSaved = Mutate(File.ReadAllBytes(path), workbook =>
+                {
+                    IXLWorksheet sheet = workbook.Worksheet(DocumentationLogWorkbookSchema.DataWorksheetName);
+                    foreach (int column in idColumns)
+                    {
+                        // Excel saves Text using built-in format 49, not a custom "@" format.
+                        sheet.Cell(4, column).Style.NumberFormat.NumberFormatId = 49;
+                    }
+                });
+                File.WriteAllBytes(path, excelSaved);
+            }
+
+            environment.WorkbookService.ValidateRunningWorkbook(type, fileName);
+            DocumentationLogTestAssert.True(
+                environment.WorkbookService.GetCompatibleRunningWorkbookFileNames(type).Contains(fileName),
+                "Discovery omitted a workbook saved with Excel's built-in Text format.");
+            environment.CreateSaveService().Save(request);
+
+            foreach (string path in paths)
+            {
+                using XLWorkbook workbook = new(path);
+                IXLWorksheet sheet = workbook.Worksheet(DocumentationLogWorkbookSchema.DataWorksheetName);
+                DocumentationLogTestAssert.Equal(first.Event.LogId, sheet.Cell(4, 2).GetString(),
+                    "Appending changed a historical Log ID.");
+                DocumentationLogTestAssert.True(sheet.Cell(4, hotelColumn).GetString().Contains("0012"),
+                    "Appending lost a historical Hotel ID's leading zeroes.");
+                DocumentationLogTestAssert.Equal(5, sheet.Tables.Single().RangeAddress.LastAddress.RowNumber,
+                    "The save did not append exactly one row to every workbook.");
+            }
+
+            byte[] valid = File.ReadAllBytes(first.RunningWorkbookPath);
+            DocumentationLogWorkbookContract contract = DocumentationLogWorkbookSchema.CreateRunningContract(type);
+            foreach (int column in idColumns)
+            {
+                AssertRejected(environment, Mutate(valid, workbook =>
+                    workbook.Worksheet(DocumentationLogWorkbookSchema.DataWorksheetName)
+                        .Cell(4, column).Value = 12), contract, first.Event,
+                    DocumentationLogWorkbookErrorCategory.IncompatibleSchema);
+                AssertRejected(environment, Mutate(valid, workbook =>
+                    workbook.Worksheet(DocumentationLogWorkbookSchema.DataWorksheetName)
+                        .Cell(4, column).Style.NumberFormat.NumberFormatId = 0), contract, first.Event,
+                    DocumentationLogWorkbookErrorCategory.IncompatibleSchema);
+            }
         }
     }
 

@@ -911,10 +911,14 @@ public sealed class DocumentationLogWorkbookService
             foreach (int column in textColumns)
             {
                 IXLCell cell = worksheet.Cell(row, column);
-                if (cell.DataType != XLDataType.Text
-                    || !cell.Style.NumberFormat.Format.Equals(
+                // Excel may save Text as built-in format 49 instead of the
+                // custom "@" format written when the workbook is created.
+                bool hasTextFormat = cell.Style.NumberFormat.NumberFormatId == 49
+                    || cell.Style.NumberFormat.Format.Equals(
                         TextNumberFormat,
-                        StringComparison.Ordinal))
+                        StringComparison.Ordinal);
+                if (cell.DataType != XLDataType.Text
+                    || !hasTextFormat)
                 {
                     throw Failure(
                         DocumentationLogWorkbookErrorCategory.IncompatibleSchema,
